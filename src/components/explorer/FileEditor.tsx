@@ -1,0 +1,513 @@
+import { invoke } from "@tauri-apps/api/core";
+import { useEffect, useRef, useState } from "react";
+import {
+  Bold,
+  Code2,
+  Heading1,
+  Heading2,
+  Heading3,
+  Italic,
+  Link,
+  List,
+  ListChecks,
+  ListOrdered,
+  Minus,
+  Quote,
+  Save,
+  Strikethrough,
+  Underline,
+} from "lucide-react";
+import { EditorState } from "@codemirror/state";
+import {
+  Decoration,
+  type DecorationSet,
+  EditorView,
+  ViewPlugin,
+  type ViewUpdate,
+  drawSelection,
+  keymap,
+} from "@codemirror/view";
+import {
+  defaultKeymap,
+  history,
+  historyKeymap,
+  indentWithTab,
+} from "@codemirror/commands";
+import { markdown } from "@codemirror/lang-markdown";
+import { HighlightStyle, syntaxHighlighting } from "@codemirror/language";
+import { tags } from "@lezer/highlight";
+import { useAppStore } from "@/store";
+import { Button } from "@/components/ui/button";
+import { Kbd } from "@/components/ui/kbd";
+import { showToast } from "@/components/common/Toaster";
+
+const markdownHighlightStyle = HighlightStyle.define([
+  {
+    tag: tags.heading1,
+    fontSize: "1.45em",
+    fontWeight: "700",
+    color: "var(--foreground)",
+  },
+  {
+    tag: tags.heading2,
+    fontSize: "1.25em",
+    fontWeight: "700",
+    color: "var(--foreground)",
+  },
+  {
+    tag: tags.heading3,
+    fontSize: "1.12em",
+    fontWeight: "650",
+    color: "var(--foreground)",
+  },
+  { tag: tags.heading, fontWeight: "650", color: "var(--foreground)" },
+  { tag: tags.strong, fontWeight: "700", color: "var(--foreground)" },
+  { tag: tags.emphasis, fontStyle: "italic", color: "var(--foreground)" },
+  { tag: tags.strikethrough, textDecoration: "line-through" },
+  {
+    tag: tags.link,
+    color: "oklch(0.55 0.18 260)",
+    textDecoration: "underline",
+  },
+  { tag: tags.url, color: "oklch(0.55 0.18 260)" },
+  {
+    tag: tags.monospace,
+    color: "oklch(0.5 0.16 150)",
+    backgroundColor: "var(--muted)",
+  },
+  { tag: tags.quote, color: "var(--muted-foreground)", fontStyle: "italic" },
+  { tag: tags.contentSeparator, color: "var(--muted-foreground)" },
+  {
+    tag: tags.processingInstruction,
+    color: "oklch(0.6 0.16 35)",
+    fontSize: "0.9em",
+    fontWeight: "500",
+  },
+]);
+
+const editorTheme = EditorView.theme({
+  "&": {
+    height: "100%",
+    backgroundColor: "transparent",
+    color: "var(--foreground)",
+    fontSize: "14px",
+  },
+  ".cm-scroller": {
+    fontFamily:
+      'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace',
+    lineHeight: "1.7",
+    paddingBottom: "96px",
+  },
+  ".cm-content": {
+    minHeight: "100%",
+    padding: "24px",
+    caretColor: "var(--foreground)",
+  },
+  ".cm-line": {
+    padding: "0 2px",
+  },
+  ".cm-selectionBackground": {
+    backgroundColor: "oklch(0.72 0.12 260 / 0.28) !important",
+  },
+  ".cm-cursor": {
+    borderLeftColor: "var(--foreground)",
+  },
+  ".cm-activeLine": {
+    backgroundColor: "var(--muted)",
+  },
+  ".cm-gutters": {
+    display: "none",
+  },
+  ".cm-focused": {
+    outline: "none",
+  },
+  ".cm-frontmatter-line": {
+    fontSize: "12px",
+    lineHeight: "1.45",
+    color: "var(--muted-foreground)",
+  },
+  ".cm-frontmatter-line .tok-heading": {
+    fontSize: "12px",
+    fontWeight: "500",
+  },
+});
+
+const frontmatterPlugin = ViewPlugin.fromClass(
+  class {
+    decorations: DecorationSet;
+
+    constructor(view: EditorView) {
+      this.decorations = getFrontmatterDecorations(view);
+    }
+
+    update(update: ViewUpdate) {
+      if (update.docChanged || update.viewportChanged) {
+        this.decorations = getFrontmatterDecorations(update.view);
+      }
+    }
+  },
+  {
+    decorations: (plugin) => plugin.decorations,
+  },
+);
+
+function getFrontmatterDecorations(view: EditorView) {
+  const decorations = [];
+  const firstLine = view.state.doc.line(1);
+
+  if (firstLine.text.trim() !== "---") {
+    return Decoration.none;
+  }
+
+  for (let lineNumber = 1; lineNumber <= view.state.doc.lines; lineNumber++) {
+    const line = view.state.doc.line(lineNumber);
+    decorations.push(
+      Decoration.line({ class: "cm-frontmatter-line" }).range(line.from),
+    );
+
+    if (lineNumber > 1 && line.text.trim() === "---") {
+      break;
+    }
+  }
+
+  return Decoration.set(decorations, true);
+}
+
+type ToolbarAction = {
+  label: string;
+  icon: React.ReactNode;
+  action: () => void;
+};
+
+function formatTokenCount(chars: number): string {
+  const tokens = Math.round(chars / 4);
+  if (tokens >= 1000) return `≈ ${(tokens / 1000).toFixed(1)}k tokens`;
+  return `≈ ${tokens} tokens`;
+}
+
+export function FileEditor() {
+  const {
+    viewerFile,
+    editContent,
+    isDirty,
+    repoPath,
+    setEditContent,
+    setFileContent,
+  } = useAppStore();
+  const editorHostRef = useRef<HTMLDivElement | null>(null);
+  const editorViewRef = useRef<EditorView | null>(null);
+  const latestStateRef = useRef({ viewerFile, editContent, repoPath });
+  const [saving, setSaving] = useState(false);
+
+  latestStateRef.current = { viewerFile, editContent, repoPath };
+
+  async function save() {
+    const { viewerFile, editContent, repoPath } = latestStateRef.current;
+    if (!viewerFile || editContent === null) return;
+    setSaving(true);
+    try {
+      await invoke("write_file", {
+        filePath: viewerFile.path,
+        content: editContent,
+        repoPath,
+      });
+      setFileContent(editContent);
+      showToast({
+        title: "File saved",
+        description: viewerFile.relative_path,
+      });
+    } catch (e) {
+      console.error("Failed to save:", e);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  useEffect(() => {
+    if (!editorHostRef.current || editContent === null) return;
+
+    const view = new EditorView({
+      parent: editorHostRef.current,
+      state: EditorState.create({
+        doc: editContent,
+        extensions: [
+          history(),
+          drawSelection(),
+          markdown(),
+          syntaxHighlighting(markdownHighlightStyle),
+          editorTheme,
+          frontmatterPlugin,
+          EditorView.lineWrapping,
+          keymap.of([
+            {
+              key: "Mod-s",
+              run: () => {
+                void save();
+                return true;
+              },
+            },
+            indentWithTab,
+            ...defaultKeymap,
+            ...historyKeymap,
+          ]),
+          EditorView.updateListener.of((update) => {
+            if (update.docChanged) {
+              setEditContent(update.state.doc.toString());
+            }
+          }),
+        ],
+      }),
+    });
+
+    editorViewRef.current = view;
+
+    return () => {
+      view.destroy();
+      editorViewRef.current = null;
+    };
+  }, [setEditContent]);
+
+  useEffect(() => {
+    const view = editorViewRef.current;
+    if (!view || editContent === null) return;
+
+    const current = view.state.doc.toString();
+    if (current !== editContent) {
+      view.dispatch({
+        changes: { from: 0, to: current.length, insert: editContent },
+      });
+    }
+  }, [editContent]);
+
+  if (!viewerFile || editContent === null) return null;
+
+  function focusEditor(view: EditorView) {
+    window.requestAnimationFrame(() => view.focus());
+  }
+
+  function replaceSelection(
+    insertText: string,
+    anchorOffset = 0,
+    headOffset = insertText.length,
+  ) {
+    const view = editorViewRef.current;
+    if (!view) return;
+
+    const { from, to } = view.state.selection.main;
+    view.dispatch({
+      changes: { from, to, insert: insertText },
+      selection: {
+        anchor: from + anchorOffset,
+        head: from + headOffset,
+      },
+    });
+    focusEditor(view);
+  }
+
+  function wrapSelection(before: string, after = before, placeholder = "text") {
+    const view = editorViewRef.current;
+    if (!view) return;
+
+    const selection = view.state.selection.main;
+    const selected = view.state.doc.sliceString(selection.from, selection.to);
+    const body = selected || placeholder;
+    const insertText = `${before}${body}${after}`;
+    const bodyStart = before.length;
+    const bodyEnd = bodyStart + body.length;
+
+    view.dispatch({
+      changes: { from: selection.from, to: selection.to, insert: insertText },
+      selection: selected
+        ? { anchor: selection.from + insertText.length }
+        : {
+            anchor: selection.from + bodyStart,
+            head: selection.from + bodyEnd,
+          },
+    });
+    focusEditor(view);
+  }
+
+  function transformSelectedLines(transform: (lineText: string) => string) {
+    const view = editorViewRef.current;
+    if (!view) return;
+
+    const { from, to } = view.state.selection.main;
+    const startLine = view.state.doc.lineAt(from);
+    const endLine = view.state.doc.lineAt(to);
+    const changes = [];
+
+    for (
+      let lineNumber = startLine.number;
+      lineNumber <= endLine.number;
+      lineNumber++
+    ) {
+      const line = view.state.doc.line(lineNumber);
+      changes.push({
+        from: line.from,
+        to: line.to,
+        insert: transform(line.text),
+      });
+    }
+
+    view.dispatch({ changes });
+    focusEditor(view);
+  }
+
+  function setHeading(level: 1 | 2 | 3) {
+    const hashes = "#".repeat(level);
+    transformSelectedLines(
+      (line) => `${hashes} ${line.replace(/^#{1,6}\s+/, "")}`,
+    );
+  }
+
+  function prefixLines(prefix: string) {
+    transformSelectedLines((line) => `${prefix}${line}`);
+  }
+
+  function insertCodeBlock() {
+    const view = editorViewRef.current;
+    if (!view) return;
+
+    const selection = view.state.selection.main;
+    const selected = view.state.doc.sliceString(selection.from, selection.to);
+    const body = selected || "code";
+    const insertText = `\`\`\`\n${body}\n\`\`\``;
+    view.dispatch({
+      changes: { from: selection.from, to: selection.to, insert: insertText },
+      selection: selected
+        ? { anchor: selection.from + insertText.length }
+        : {
+            anchor: selection.from + 4,
+            head: selection.from + 4 + body.length,
+          },
+    });
+    focusEditor(view);
+  }
+
+  const toolbarActions: ToolbarAction[] = [
+    {
+      label: "H1",
+      icon: <Heading1 className="h-3.5 w-3.5" />,
+      action: () => setHeading(1),
+    },
+    {
+      label: "H2",
+      icon: <Heading2 className="h-3.5 w-3.5" />,
+      action: () => setHeading(2),
+    },
+    {
+      label: "H3",
+      icon: <Heading3 className="h-3.5 w-3.5" />,
+      action: () => setHeading(3),
+    },
+    {
+      label: "Bold",
+      icon: <Bold className="h-3.5 w-3.5" />,
+      action: () => wrapSelection("**"),
+    },
+    {
+      label: "Italic",
+      icon: <Italic className="h-3.5 w-3.5" />,
+      action: () => wrapSelection("_"),
+    },
+    {
+      label: "Underline",
+      icon: <Underline className="h-3.5 w-3.5" />,
+      action: () => wrapSelection("<u>", "</u>"),
+    },
+    {
+      label: "Strike",
+      icon: <Strikethrough className="h-3.5 w-3.5" />,
+      action: () => wrapSelection("~~"),
+    },
+    {
+      label: "Inline code",
+      icon: <Code2 className="h-3.5 w-3.5" />,
+      action: () => wrapSelection("`"),
+    },
+    {
+      label: "Link",
+      icon: <Link className="h-3.5 w-3.5" />,
+      action: () => replaceSelection("[link text](https://)", 1, 10),
+    },
+    {
+      label: "Quote",
+      icon: <Quote className="h-3.5 w-3.5" />,
+      action: () => prefixLines("> "),
+    },
+    {
+      label: "Bulleted list",
+      icon: <List className="h-3.5 w-3.5" />,
+      action: () => prefixLines("- "),
+    },
+    {
+      label: "Numbered list",
+      icon: <ListOrdered className="h-3.5 w-3.5" />,
+      action: () => prefixLines("1. "),
+    },
+    {
+      label: "Task",
+      icon: <ListChecks className="h-3.5 w-3.5" />,
+      action: () => prefixLines("- [ ] "),
+    },
+    {
+      label: "Code block",
+      icon: <Code2 className="h-3.5 w-3.5" />,
+      action: insertCodeBlock,
+    },
+    {
+      label: "Rule",
+      icon: <Minus className="h-3.5 w-3.5" />,
+      action: () => replaceSelection("\n---\n"),
+    },
+  ];
+
+  return (
+    <div className="relative h-full overflow-hidden bg-background">
+      <div ref={editorHostRef} className="h-full" />
+
+      <div className="pointer-events-none absolute inset-x-0 bottom-0 h-32 bg-linear-to-b from-transparent via-background/55 to-background" />
+      <div className="pointer-events-none absolute inset-x-0 bottom-4 flex justify-center px-4">
+        <div className="pointer-events-auto flex max-w-full items-center gap-1 overflow-x-auto rounded-xl border bg-popover/95 p-1.5 text-popover-foreground shadow-lg backdrop-blur">
+          {toolbarActions.map((item) => (
+            <Button
+              key={item.label}
+              type="button"
+              variant="ghost"
+              size="icon-sm"
+              title={item.label}
+              onClick={item.action}
+            >
+              {item.icon}
+              <span className="sr-only">{item.label}</span>
+            </Button>
+          ))}
+          <div className="mx-1 h-6 w-px bg-border" />
+          <span className="px-2 text-xs text-muted-foreground whitespace-nowrap">
+            {formatTokenCount(editContent.length)}
+          </span>
+          <div className="mx-1 h-6 w-px bg-border" />
+          {isDirty ? (
+            <span className="px-2 text-xs text-muted-foreground whitespace-nowrap">
+              {saving ? "Saving…" : "Unsaved"}
+            </span>
+          ) : (
+            <span className="px-2 text-xs text-muted-foreground/50 whitespace-nowrap">
+              Saved
+            </span>
+          )}
+          <Button
+            onClick={save}
+            disabled={!isDirty || saving}
+            size="sm"
+            className="pr-1"
+          >
+            <Save className="h-3.5 w-3.5 mr-1" />
+            Save
+            {!saving && <Kbd className="ml-1 bg-background/70">⌘S</Kbd>}
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
