@@ -213,23 +213,54 @@ export function AppSidebar() {
     setIsRenaming(true);
     setRenameError(null);
     try {
-      const newPath = await invoke<string>("rename_file", {
-        oldPath: renamingItem.path,
-        newName,
-        repoPath,
-      });
-      // If the renamed file is currently open in the viewer, update it
-      if (viewerFile?.path === renamingItem.path) {
-        const newRelative = renamingItem.relative_path
-          .split("/")
-          .slice(0, -1)
-          .concat(newName)
-          .join("/");
-        setViewerFile({
-          name: newName,
-          path: newPath,
-          relative_path: newRelative,
+      if (renamingItem.type === "skill") {
+        const oldReadmePath = renamingItem.path;
+        const oldSkillDir = oldReadmePath.slice(0, oldReadmePath.lastIndexOf("/"));
+        const parentDir = oldSkillDir.slice(0, oldSkillDir.lastIndexOf("/"));
+        const newSkillDir = `${parentDir}/${newName}`;
+        const newReadmePath = `${newSkillDir}/${oldReadmePath.split("/").pop()}`;
+        await invoke<string>("move_path", {
+          oldPath: oldSkillDir,
+          newPath: newSkillDir,
+          repoPath,
         });
+        // If the renamed skill readme is currently open in the viewer, update it
+        if (viewerFile?.path === oldReadmePath) {
+          const oldReadmeRelative = renamingItem.relative_path;
+          const oldSkillDirRelative = oldReadmeRelative.slice(
+            0,
+            oldReadmeRelative.lastIndexOf("/"),
+          );
+          const parentRelative = oldSkillDirRelative.slice(
+            0,
+            oldSkillDirRelative.lastIndexOf("/"),
+          );
+          const newReadmeRelative = `${parentRelative}/${newName}/${oldReadmePath.split("/").pop()}`;
+          setViewerFile({
+            name: newName,
+            path: newReadmePath,
+            relative_path: newReadmeRelative,
+          });
+        }
+      } else {
+        const newPath = await invoke<string>("rename_file", {
+          oldPath: renamingItem.path,
+          newName,
+          repoPath,
+        });
+        // If the renamed file is currently open in the viewer, update it
+        if (viewerFile?.path === renamingItem.path) {
+          const newRelative = renamingItem.relative_path
+            .split("/")
+            .slice(0, -1)
+            .concat(newName)
+            .join("/");
+          setViewerFile({
+            name: newName,
+            path: newPath,
+            relative_path: newRelative,
+          });
+        }
       }
       void rescan();
       setRenamingItem(null);

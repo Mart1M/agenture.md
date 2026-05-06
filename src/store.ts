@@ -111,7 +111,7 @@ interface AppState {
   /** Open a specific path directly (e.g. from recent repos list) */
   openRecentRepo: (path: string) => Promise<void>;
   /** Re-run scan_repository on the current repoPath (e.g. after rename/delete) */
-  rescan: () => Promise<void>;
+  rescan: (options?: { silent?: boolean }) => Promise<void>;
   reset: () => void;
 }
 
@@ -259,10 +259,11 @@ export const useAppStore = create<AppState>((set) => ({
     }
   },
 
-  rescan: async () => {
+  rescan: async (options) => {
     const { repoPath } = useAppStore.getState();
     if (!repoPath) return;
-    set({ isScanning: true });
+    const silent = options?.silent === true;
+    if (!silent) set({ isScanning: true });
     try {
       const result = await invoke<RepoScanResult>("scan_repository", {
         repoPath,
@@ -271,7 +272,7 @@ export const useAppStore = create<AppState>((set) => ({
     } catch (e) {
       console.error("Rescan failed:", e);
     } finally {
-      set({ isScanning: false });
+      if (!silent) set({ isScanning: false });
     }
   },
 

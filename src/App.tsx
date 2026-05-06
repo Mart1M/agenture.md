@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { listen } from "@tauri-apps/api/event";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -12,6 +12,7 @@ import { Toaster } from "./components/common/Toaster";
 
 function App() {
   const { selectedItem, repoPath, scanResult } = useAppStore();
+  const isAutoRescanningRef = useRef(false);
 
   useEffect(() => {
     const pending = listen("open-repository", () => {
@@ -22,6 +23,27 @@ function App() {
       void pending.then((unlisten) => unlisten());
     };
   }, []);
+
+  useEffect(() => {
+    if (!repoPath || !scanResult) return;
+
+    const tick = () => {
+      if (isAutoRescanningRef.current) return;
+      if (document.hidden) return;
+      isAutoRescanningRef.current = true;
+      void useAppStore
+        .getState()
+        .rescan({ silent: true })
+        .finally(() => {
+          isAutoRescanningRef.current = false;
+        });
+    };
+
+    const interval = window.setInterval(tick, 2500);
+    return () => {
+      window.clearInterval(interval);
+    };
+  }, [repoPath, scanResult]);
 
   const showTopBar = Boolean(repoPath && scanResult);
 
