@@ -3,7 +3,11 @@ mod types;
 
 use commands::cli::run_cli_command;
 use commands::fetch::fetch_url;
-use commands::files::{delete_file, read_file, rename_file, search_files_content, write_file};
+use commands::git::git_graph_snapshot;
+use commands::files::{
+    create_directory, create_skill_scaffold, delete_file, move_path, read_file, rename_file,
+    search_files_content, write_file,
+};
 use commands::packages::{detect_npm_client, list_package_workspaces};
 use commands::scan::scan_repository;
 use commands::terminal::{
@@ -27,6 +31,9 @@ pub fn run() {
             rename_file,
             delete_file,
             search_files_content,
+            create_directory,
+            create_skill_scaffold,
+            move_path,
             run_cli_command,
             fetch_url,
             detect_ai_tools,
@@ -37,6 +44,7 @@ pub fn run() {
             kill_terminal,
             list_package_workspaces,
             detect_npm_client,
+            git_graph_snapshot,
         ])
         .setup(|app| {
             #[cfg(desktop)]

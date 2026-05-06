@@ -30,7 +30,7 @@ function persistRecentRepo(path: string): string[] {
 
 type ViewMode = "rendered" | "edit";
 type SidebarTab = "agents" | "skills";
-type CurrentView = "explorer" | "skills" | "terminal" | "mcp";
+type CurrentView = "explorer" | "skills" | "terminal" | "mcp" | "git";
 
 export interface AiToolBasic {
   id: string;
@@ -166,7 +166,13 @@ export const useAppStore = create<AppState>((set) => ({
     }),
 
   setViewerFile: (file) =>
-    set({ viewerFile: file, fileContent: null, viewMode: "edit", editContent: null, isDirty: false }),
+    set(() => ({
+      viewerFile: file,
+      fileContent: null,
+      editContent: null,
+      isDirty: false,
+      ...(file === null ? { viewMode: "edit" as ViewMode } : {}),
+    })),
 
   setFileContent: (content) => set({ fileContent: content, editContent: content, isDirty: false }),
   setIsLoadingFile: (v) => set({ isLoadingFile: v }),

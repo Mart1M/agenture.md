@@ -47,6 +47,59 @@ fn validate_write_path(file_path: &str, repo_path: &str) -> Result<(), String> {
     validate_extension(file_path)
 }
 
+fn validate_create_directory_path(directory_path: &str, repo_path: &str) -> Result<(), String> {
+    let dir = Path::new(directory_path);
+    let canonical_repo = Path::new(repo_path)
+        .canonicalize()
+        .map_err(|e| format!("Invalid repo path: {}", e))?;
+
+    let canonical_parent = dir
+        .parent()
+        .ok_or_else(|| "Invalid directory path: missing parent directory".to_string())?
+        .canonicalize()
+        .map_err(|e| format!("Invalid target parent directory: {}", e))?;
+
+    if !canonical_parent.starts_with(&canonical_repo) {
+        return Err("Access denied: path outside repository".into());
+    }
+
+    Ok(())
+}
+
+fn validate_move_paths(old_path: &str, new_path: &str, repo_path: &str) -> Result<(), String> {
+    let old = Path::new(old_path);
+    if !old.exists() {
+        return Err("Source path does not exist".into());
+    }
+
+    let canonical_repo = Path::new(repo_path)
+        .canonicalize()
+        .map_err(|e| format!("Invalid repo path: {}", e))?;
+
+    let canonical_old = old
+        .canonicalize()
+        .map_err(|e| format!("Invalid source path: {}", e))?;
+    if !canonical_old.starts_with(&canonical_repo) {
+        return Err("Access denied: source outside repository".into());
+    }
+
+    let new_parent = Path::new(new_path)
+        .parent()
+        .ok_or_else(|| "Invalid destination path: missing parent directory".to_string())?;
+    let canonical_new_parent = new_parent
+        .canonicalize()
+        .map_err(|e| format!("Invalid destination parent directory: {}", e))?;
+    if !canonical_new_parent.starts_with(&canonical_repo) {
+        return Err("Access denied: destination outside repository".into());
+    }
+
+    if Path::new(new_path).exists() {
+        return Err("Destination already exists".into());
+    }
+
+    Ok(())
+}
+
 #[tauri::command]
 pub fn read_file(file_path: String, repo_path: String) -> Result<String, String> {
     validate_read_path(&file_path, &repo_path)?;
@@ -57,6 +110,76 @@ pub fn read_file(file_path: String, repo_path: String) -> Result<String, String>
 pub fn write_file(file_path: String, content: String, repo_path: String) -> Result<(), String> {
     validate_write_path(&file_path, &repo_path)?;
     std::fs::write(&file_path, &content).map_err(|e| format!("Failed to write file: {}", e))
+}
+
+#[tauri::command]
+pub fn create_directory(directory_path: String, repo_path: String) -> Result<(), String> {
+    validate_create_directory_path(&directory_path, &repo_path)?;
+    if Path::new(&directory_path).exists() {
+        return Err("Directory already exists".into());
+    }
+    std::fs::create_dir(&directory_path)
+        .map_err(|e| format!("Failed to create directory: {}", e))
+}
+
+#[tauri::command]
+pub fn move_path(old_path: String, new_path: String, repo_path: String) -> Result<String, String> {
+    validate_move_paths(&old_path, &new_path, &repo_path)?;
+    std::fs::rename(&old_path, &new_path).map_err(|e| format!("Failed to move path: {}", e))?;
+    Ok(new_path)
+}
+
+fn to_kebab_case(input: &str) -> String {
+    let mut out = String::new();
+    let mut prev_dash = false;
+
+    for ch in input.chars() {
+        if ch.is_ascii_alphanumeric() {
+            out.push(ch.to_ascii_lowercase());
+            prev_dash = false;
+        } else if !prev_dash {
+            out.push('-');
+            prev_dash = true;
+        }
+    }
+
+    out.trim_matches('-').to_string()
+}
+
+#[tauri::command]
+pub fn create_skill_scaffold(
+    name: String,
+    description: String,
+    repo_path: String,
+) -> Result<String, String> {
+    let canonical_repo = Path::new(&repo_path)
+        .canonicalize()
+        .map_err(|e| format!("Invalid repo path: {}", e))?;
+
+    let slug = to_kebab_case(&name);
+    if slug.is_empty() {
+        return Err("Skill name must contain at least one letter or number".into());
+    }
+
+    let skill_dir = canonical_repo.join(".agents").join("skills").join(&slug);
+    std::fs::create_dir_all(&skill_dir)
+        .map_err(|e| format!("Failed to create skill directory: {}", e))?;
+
+    let skill_file = skill_dir.join("SKILL.md");
+    if skill_file.exists() {
+        return Err(format!("Skill already exists: {}", slug));
+    }
+
+    let content = format!(
+        "---\nname: {}\ndescription: {}\n---\n",
+        slug,
+        description.trim()
+    );
+
+    std::fs::write(&skill_file, content)
+        .map_err(|e| format!("Failed to write SKILL.md: {}", e))?;
+
+    Ok(skill_file.to_string_lossy().to_string())
 }
 
 #[tauri::command]

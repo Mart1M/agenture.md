@@ -15,7 +15,10 @@ export interface SkillFile {
 
 export interface SkillFolder {
   name: string;
+  /** Relative to skill directory, e.g. `references` or `references/deep` */
+  rel_path: string;
   files: SkillFile[];
+  folders: SkillFolder[];
 }
 
 export interface DetectedSkill {

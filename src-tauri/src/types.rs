@@ -19,11 +19,14 @@ pub struct SkillFile {
     pub size_bytes: u64,
 }
 
-/// A sub-folder inside a skill directory
+/// A sub-folder inside a skill directory (may contain nested folders)
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SkillFolder {
-    pub name: String, // folder name (raw, e.g. "rules")
+    pub name: String, // last path segment (e.g. "rules")
+    /// Path relative to the skill directory, POSIX-style (e.g. `references` or `references/deep`)
+    pub rel_path: String,
     pub files: Vec<SkillFile>,
+    pub folders: Vec<SkillFolder>,
 }
 
 /// A detected skill — a directory containing SKILL.md or skills.md

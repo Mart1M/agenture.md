@@ -1,21 +1,37 @@
 import { open } from "@tauri-apps/plugin-dialog";
 import { invoke } from "@tauri-apps/api/core";
-import { FolderOpen } from "lucide-react";
+import { useEffect, useState } from "react";
+import { FolderOpen, GitBranch } from "lucide-react";
 import { useAppStore } from "@/store";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import type { RepoScanResult } from "@/types";
 
+interface GitGraphRef {
+  tip: string;
+  name: string;
+  fullName: string;
+}
+
+interface GitGraphSnapshot {
+  refs: GitGraphRef[];
+  headId: string | null;
+}
+
 export function TopBar() {
-  const { repoPath, scanResult, setRepoPath, setScanResult, setIsScanning } = useAppStore();
+  const { repoPath, scanResult, setRepoPath, setScanResult, setIsScanning } =
+    useAppStore();
+  const [currentBranch, setCurrentBranch] = useState<string | null>(null);
 
   async function openRepo() {
     const selected = await open({ directory: true, multiple: false });
     if (!selected) return;
     setIsScanning(true);
     try {
-      const result = await invoke<RepoScanResult>("scan_repository", { repoPath: selected });
+      const result = await invoke<RepoScanResult>("scan_repository", {
+        repoPath: selected,
+      });
       setRepoPath(selected);
       setScanResult(result);
     } catch (e) {
@@ -26,7 +42,35 @@ export function TopBar() {
   }
 
   const repoName = repoPath?.split("/").pop() ?? null;
-  const total = (scanResult?.agents.length ?? 0) + (scanResult?.skills.length ?? 0);
+  const total =
+    (scanResult?.agents.length ?? 0) + (scanResult?.skills.length ?? 0);
+
+  useEffect(() => {
+    let cancelled = false;
+    if (!repoPath) {
+      setCurrentBranch(null);
+      return;
+    }
+
+    invoke<GitGraphSnapshot>("git_graph_snapshot", { repoPath })
+      .then((snapshot) => {
+        if (cancelled) return;
+        const localHead = snapshot.refs.find(
+          (ref) =>
+            ref.tip === snapshot.headId &&
+            ref.fullName.startsWith("refs/heads/"),
+        );
+        setCurrentBranch(localHead?.name ?? null);
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setCurrentBranch(null);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [repoPath]);
 
   return (
     <header className="flex h-12 shrink-0 items-center gap-2 border-b px-4 transition-[width,height] ease-linear group-has-data-[collapsible=icon]/sidebar-wrapper:h-12">
@@ -38,6 +82,12 @@ export function TopBar() {
           <>
             <span className="text-muted-foreground text-sm">/</span>
             <span className="text-sm text-muted-foreground">{repoName}</span>
+            {currentBranch && (
+              <span className="inline-flex items-center gap-1 text-sm text-muted-foreground">
+                <GitBranch className="h-3.5 w-3.5" />
+                {currentBranch}
+              </span>
+            )}
             {total > 0 && (
               <Badge variant="secondary" className="text-xs">
                 {total} file{total !== 1 ? "s" : ""}

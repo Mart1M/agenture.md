@@ -14,12 +14,18 @@ import {
   Trash2,
   MousePointer2,
   Wind,
-  GitBranch,
+  GitGraph,
   Search,
   FileText,
 } from "lucide-react";
 import { invoke } from "@tauri-apps/api/core";
-import { useCallback, useDeferredValue, useEffect, useMemo, useState } from "react";
+import {
+  useCallback,
+  useDeferredValue,
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
 import { useAppStore } from "@/store";
 import { formatName } from "@/lib/format";
 import { cn } from "@/lib/utils";
@@ -38,6 +44,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import {
   Dialog,
   DialogContent,
@@ -54,7 +61,14 @@ import {
   ContextMenuTrigger,
 } from "@/components/ui/context-menu";
 import { showToast } from "@/components/common/Toaster";
-import type { FileItem, FileSearchHit, RepoScanResult, ViewerFile } from "@/types";
+import { LoadingSpinner } from "@/components/common/LoadingSpinner";
+import type {
+  FileItem,
+  FileSearchHit,
+  RepoScanResult,
+  SkillFolder,
+  ViewerFile,
+} from "@/types";
 import appIconUrl from "../../../resources/icon.svg?url";
 import { toggleAppTheme } from "@/lib/theme";
 import {
@@ -76,7 +90,10 @@ function normPath(p: string) {
   return p.replace(/\\/g, "/");
 }
 
-function hitBelongsToSkill(readmeRelative: string, hitRelativePath: string): boolean {
+function hitBelongsToSkill(
+  readmeRelative: string,
+  hitRelativePath: string,
+): boolean {
   const hr = normPath(hitRelativePath);
   const rd = normPath(readmeRelative);
   if (hr === rd) return true;
@@ -86,6 +103,13 @@ function hitBelongsToSkill(readmeRelative: string, hitRelativePath: string): boo
   return hr === dir || hr.startsWith(`${dir}/`);
 }
 
+function walkSkillFolderPaths(folder: SkillFolder): string[] {
+  const out: string[] = [];
+  for (const sf of folder.files) out.push(sf.path);
+  for (const sub of folder.folders) out.push(...walkSkillFolderPaths(sub));
+  return out;
+}
+
 function collectSearchablePaths(result: RepoScanResult): string[] {
   const s = new Set<string>();
   for (const a of result.agents) s.add(a.path);
@@ -93,7 +117,7 @@ function collectSearchablePaths(result: RepoScanResult): string[] {
     s.add(sk.readme_path);
     for (const f of sk.root_files ?? []) s.add(f.path);
     for (const folder of sk.folders ?? []) {
-      for (const sf of folder.files ?? []) s.add(sf.path);
+      for (const p of walkSkillFolderPaths(folder)) s.add(p);
     }
   }
   return [...s];
@@ -132,7 +156,7 @@ function getAgentIcon(rawName: string, relativePath?: string) {
     rawName.toLowerCase().includes("copilot") ||
     relativePath?.includes("copilot")
   )
-    return <GitBranch className="h-3.5 w-3.5 shrink-0" />;
+    return <GitGraph className="h-3.5 w-3.5 shrink-0" />;
   return <Bot className="h-3.5 w-3.5 shrink-0" />;
 }
 
@@ -161,6 +185,11 @@ export function AppSidebar() {
   const [newAgentName, setNewAgentName] = useState("");
   const [createAgentError, setCreateAgentError] = useState<string | null>(null);
   const [isCreatingAgent, setIsCreatingAgent] = useState(false);
+  const [isCreateSkillOpen, setIsCreateSkillOpen] = useState(false);
+  const [newSkillName, setNewSkillName] = useState("");
+  const [newSkillDescription, setNewSkillDescription] = useState("");
+  const [createSkillError, setCreateSkillError] = useState<string | null>(null);
+  const [isCreatingSkill, setIsCreatingSkill] = useState(false);
 
   // ── Rename dialog ───────────────────────────────────────────────────────────
   const [renamingItem, setRenamingItem] = useState<FileItem | null>(null);
@@ -274,7 +303,9 @@ export function AppSidebar() {
     });
   }
 
-  function switchTopView(view: "explorer" | "skills" | "terminal" | "mcp") {
+  function switchTopView(
+    view: "explorer" | "skills" | "terminal" | "mcp" | "git",
+  ) {
     selectItem(null);
     setCurrentView(view);
   }
@@ -307,6 +338,43 @@ export function AppSidebar() {
       setCreateAgentError(String(error));
     } finally {
       setIsCreatingAgent(false);
+    }
+  }
+
+  async function handleCreateSkill() {
+    if (!repoPath) return;
+    if (!newSkillName.trim()) {
+      setCreateSkillError("Name is required.");
+      return;
+    }
+    if (!newSkillDescription.trim()) {
+      setCreateSkillError("Description is required.");
+      return;
+    }
+
+    setIsCreatingSkill(true);
+    setCreateSkillError(null);
+    try {
+      const createdPath = await invoke<string>("create_skill_scaffold", {
+        name: newSkillName,
+        description: newSkillDescription,
+        repoPath,
+      });
+      const result = await invoke<RepoScanResult>("scan_repository", {
+        repoPath,
+      });
+      setScanResult(result);
+      setIsCreateSkillOpen(false);
+      setNewSkillName("");
+      setNewSkillDescription("");
+      showToast({
+        title: "Skill created",
+        description: createdPath.replace(`${repoPath}/`, ""),
+      });
+    } catch (error) {
+      setCreateSkillError(String(error));
+    } finally {
+      setIsCreatingSkill(false);
     }
   }
 
@@ -597,6 +665,18 @@ export function AppSidebar() {
           </SidebarMenuItem>
           <SidebarMenuItem>
             <SidebarMenuButton
+              tooltip="Visualize Git history (commits and branches)"
+              isActive={currentView === "git"}
+              onClick={() => switchTopView("git")}
+              size="default"
+              className="h-9"
+            >
+              <GitGraph />
+              <span>Git graph</span>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+          <SidebarMenuItem>
+            <SidebarMenuButton
               tooltip="Manage MCP servers for this project"
               isActive={currentView === "mcp"}
               onClick={() => switchTopView("mcp")}
@@ -818,7 +898,28 @@ export function AppSidebar() {
               disabled={!repoPath}
             >
               <FilePlus2 className="h-4 w-4" />
-              New agent file
+              Create agent
+            </Button>
+          </SidebarFooter>
+        </>
+      )}
+      {sidebarTab === "skills" && (
+        <>
+          <SidebarSeparator className="w-full mx-auto" />
+          <SidebarFooter className="p-3">
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => {
+                setCreateSkillError(null);
+                setNewSkillName("");
+                setNewSkillDescription("");
+                setIsCreateSkillOpen(true);
+              }}
+              disabled={!repoPath}
+            >
+              <FilePlus2 className="h-4 w-4" />
+              Create skill
             </Button>
           </SidebarFooter>
         </>
@@ -909,7 +1010,7 @@ export function AppSidebar() {
       <Dialog open={isCreateAgentOpen} onOpenChange={setIsCreateAgentOpen}>
         <DialogContent className="sm:max-w-sm">
           <DialogHeader>
-            <DialogTitle>New agent file</DialogTitle>
+            <DialogTitle>Create agent</DialogTitle>
             <DialogDescription>
               Enter a file name. <code className="font-mono">.md</code> will be
               added automatically.
@@ -945,6 +1046,65 @@ export function AppSidebar() {
               disabled={isCreatingAgent}
             >
               Create
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={isCreateSkillOpen} onOpenChange={setIsCreateSkillOpen}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Create skill</DialogTitle>
+            <DialogDescription>
+              Create a new skill in{" "}
+              <code className="font-mono">.agents/skills</code>.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2">
+            <div className="space-y-1">
+              <p className="text-xs font-medium">Name</p>
+              <Input
+                placeholder="e.g. My Skill"
+                value={newSkillName}
+                onChange={(e) => setNewSkillName(e.target.value)}
+                disabled={isCreatingSkill}
+              />
+            </div>
+            <div className="space-y-1">
+              <p className="text-xs font-medium">Description</p>
+              <Textarea
+                placeholder="What this skill does and when to use it."
+                value={newSkillDescription}
+                onChange={(e) => setNewSkillDescription(e.target.value)}
+                disabled={isCreatingSkill}
+                rows={4}
+              />
+              <p className="text-xs text-muted-foreground">
+                This description is important: it helps the agent know when to
+                trigger the skill.
+              </p>
+            </div>
+            {createSkillError && (
+              <p className="text-xs text-destructive">{createSkillError}</p>
+            )}
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setIsCreateSkillOpen(false)}
+              disabled={isCreatingSkill}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={() => void handleCreateSkill()}
+              disabled={
+                isCreatingSkill ||
+                !newSkillName.trim() ||
+                !newSkillDescription.trim()
+              }
+            >
+              {isCreatingSkill ? <LoadingSpinner size="sm" /> : "Create skill"}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -1041,7 +1201,9 @@ export function AppSidebar() {
                         <span className="block truncate font-mono text-[11px] text-muted-foreground">
                           {hit.relative_path}:{hit.line}
                         </span>
-                        <span className="block truncate text-sm">{hit.preview}</span>
+                        <span className="block truncate text-sm">
+                          {hit.preview}
+                        </span>
                       </span>
                     </CommandItem>
                   ))}

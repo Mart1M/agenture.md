@@ -1,5 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Search,
   Download,
@@ -9,6 +9,7 @@ import {
 } from "lucide-react";
 import { useAppStore } from "@/store";
 import { formatName } from "@/lib/format";
+import { cn } from "@/lib/utils";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -135,7 +136,9 @@ export function SkillsPage() {
     string[]
   >([INSTALL_TARGETS[0].id]);
   const [installError, setInstallError] = useState<string | null>(null);
-  const debounceRef = useRef<ReturnType<typeof setTimeout>>(undefined);
+  /** Once true: top search bar layout; landing uses centered hero. */
+  const [committedSearch, setCommittedSearch] = useState(false);
+  const [draftQuery, setDraftQuery] = useState(() => skillQuery);
 
   async function refreshInstalledSkills() {
     if (!repoPath) {
@@ -158,28 +161,26 @@ export function SkillsPage() {
     void refreshInstalledSkills();
   }, [repoPath]);
 
-  async function search(query: string) {
+  async function performSearch() {
+    const query = draftQuery.trim();
+    if (!query || !repoPath) return;
+
+    setCommittedSearch(true);
     setSkillQuery(query);
-    if (debounceRef.current) clearTimeout(debounceRef.current);
-    if (!query.trim() || !repoPath) {
+    setSkillResults([]);
+    setIsSearchingSkills(true);
+    try {
+      const result = await invoke<CommandOutput>("run_cli_command", {
+        command: "npx",
+        args: ["skills", "find", query],
+        cwd: repoPath,
+      });
+      setSkillResults(parseSkillsOutput(result.stdout));
+    } catch {
       setSkillResults([]);
-      return;
+    } finally {
+      setIsSearchingSkills(false);
     }
-    debounceRef.current = setTimeout(async () => {
-      setIsSearchingSkills(true);
-      try {
-        const result = await invoke<CommandOutput>("run_cli_command", {
-          command: "npx",
-          args: ["skills", "find", query],
-          cwd: repoPath,
-        });
-        setSkillResults(parseSkillsOutput(result.stdout));
-      } catch {
-        setSkillResults([]);
-      } finally {
-        setIsSearchingSkills(false);
-      }
-    }, 300);
   }
 
   function openDetail(skill: SkillSearchResult) {
@@ -279,57 +280,104 @@ export function SkillsPage() {
     ? installingId === selectedSkill.skill_id
     : false;
 
+  const registryBlurb = (
+    <p
+      className={cn(
+        "max-w-xl text-xs text-muted-foreground",
+        committedSearch ? "text-left" : "text-center",
+      )}
+    >
+      Search and install skills from{" "}
+      <a
+        href="https://skills.sh"
+        target="_blank"
+        rel="noreferrer"
+        className="underline underline-offset-2 hover:text-foreground transition-colors"
+      >
+        skills.sh
+      </a>{" "}
+      into your repository.
+    </p>
+  );
+
+  const searchControls = (
+    <div className="flex w-full max-w-xl flex-col gap-2 sm:flex-row sm:items-center">
+      <div className="relative min-w-0 flex-1">
+        <Search className="pointer-events-none absolute left-3 top-1/2 z-10 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+        <Input
+          name="skills-query"
+          value={draftQuery}
+          onChange={(e) => setDraftQuery(e.target.value)}
+          placeholder="Search skills…"
+          className="pl-9"
+          disabled={isSearchingSkills}
+          autoComplete="off"
+          onKeyDown={(e) => {
+            if (e.key === "Enter") {
+              e.preventDefault();
+              void performSearch();
+            }
+          }}
+        />
+      </div>
+      <Button
+        type="button"
+        onClick={() => void performSearch()}
+        disabled={
+          !draftQuery.trim() || !repoPath || isSearchingSkills
+        }
+        className="sm:shrink-0"
+      >
+        {isSearchingSkills ? (
+          <LoadingSpinner size="sm" />
+        ) : (
+          <>
+            <Search className="mr-1.5 size-4" aria-hidden />
+            Search
+          </>
+        )}
+      </Button>
+    </div>
+  );
+
   return (
-    <div className="flex flex-col h-full">
-      {/* Header */}
-      <div className="flex items-center gap-3 px-6 py-5 shrink-0">
-        <Brain className="h-5 w-5 text-muted-foreground" />
-        <div>
-          <h2 className="text-sm font-semibold">Skills Registry</h2>
-          <p className="text-xs text-muted-foreground">
-            Search and install skills from{" "}
-            <a
-              href="https://skills.sh"
-              target="_blank"
-              rel="noreferrer"
-              className="underline underline-offset-2 hover:text-foreground transition-colors"
-            >
-              skills.sh
-            </a>{" "}
-            into your repository.
-          </p>
+    <div className="flex h-full flex-col">
+      {!committedSearch ? (
+        <div className="flex flex-1 flex-col items-center justify-center gap-8 px-6 py-12">
+          <div className="flex max-w-lg flex-col items-center gap-3 text-center">
+            <Brain className="size-12 text-muted-foreground" aria-hidden />
+            <h2 className="text-xl font-semibold tracking-tight">
+              Skills Registry
+            </h2>
+            {registryBlurb}
+          </div>
+          {searchControls}
         </div>
-      </div>
+      ) : (
+        <>
+          <div className="flex shrink-0 items-center gap-3 px-6 py-5">
+            <Brain className="size-5 shrink-0 text-muted-foreground" />
+            <div>
+              <h2 className="text-sm font-semibold">Skills Registry</h2>
+              {registryBlurb}
+            </div>
+          </div>
 
-      {/* Search */}
-      <div className="px-6 pb-4 shrink-0">
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input
-            autoFocus
-            value={skillQuery}
-            onChange={(e) => search(e.target.value)}
-            placeholder="Search skills…"
-            className="pl-9"
-          />
-        </div>
-      </div>
+          <div className="shrink-0 border-b px-6 pb-4">
+            {searchControls}
+          </div>
 
-      {/* Results */}
-      <div className="flex-1 overflow-y-auto px-6 pb-6">
+          <div className="flex-1 overflow-y-auto px-6 pb-6">
         {isSearchingSkills && (
           <div className="flex justify-center py-12">
             <LoadingSpinner />
           </div>
         )}
-        {!isSearchingSkills && skillQuery && skillResults.length === 0 && (
+        {!isSearchingSkills &&
+          !!skillQuery &&
+          skillResults.length === 0 && (
           <p className="text-sm text-muted-foreground text-center py-12">
             No skills found for "{skillQuery}"
-          </p>
-        )}
-        {!isSearchingSkills && !skillQuery && (
-          <p className="text-sm text-muted-foreground text-center py-12">
-            Type to search available skills…
           </p>
         )}
         {!isSearchingSkills && skillResults.length > 0 && (
@@ -396,7 +444,9 @@ export function SkillsPage() {
             })}
           </div>
         )}
-      </div>
+          </div>
+        </>
+      )}
 
       {/* Detail dialog */}
       <Dialog
@@ -412,28 +462,30 @@ export function SkillsPage() {
                 {formatName(selectedSkill.name)}
               </DialogTitle>
               {selectedSkill.owner && (
-                <div className="flex items-center gap-3 pt-1">
+                <div className="flex flex-col items-start gap-2 pt-1">
                   <Badge variant="outline" className="text-xs font-normal">
                     {selectedSkill.owner}/{selectedSkill.repo}
                   </Badge>
-                  <a
-                    href={`https://skills.sh/${selectedSkill.owner}/${selectedSkill.repo}/${selectedSkill.name}`}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1 transition-colors"
-                  >
-                    <ExternalLink className="h-3 w-3" />
-                    skills.sh
-                  </a>
-                  <a
-                    href={`https://github.com/${selectedSkill.owner}/${selectedSkill.repo}`}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1 transition-colors"
-                  >
-                    <ExternalLink className="h-3 w-3" />
-                    GitHub
-                  </a>
+                  <div className="flex items-center gap-3">
+                    <a
+                      href={`https://skills.sh/${selectedSkill.owner}/${selectedSkill.repo}/${selectedSkill.name}`}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1 transition-colors"
+                    >
+                      <ExternalLink className="h-3 w-3" />
+                      skills.sh
+                    </a>
+                    <a
+                      href={`https://github.com/${selectedSkill.owner}/${selectedSkill.repo}`}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1 transition-colors"
+                    >
+                      <ExternalLink className="h-3 w-3" />
+                      GitHub
+                    </a>
+                  </div>
                 </div>
               )}
             </DialogHeader>
@@ -562,6 +614,7 @@ export function SkillsPage() {
           </DialogContent>
         )}
       </Dialog>
+
     </div>
   );
 }

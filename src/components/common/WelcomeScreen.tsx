@@ -1,22 +1,45 @@
-import { Clock, FolderOpen } from "lucide-react";
+import { useCallback, useState } from "react";
+import { Clock, FolderOpen, Moon, Sun } from "lucide-react";
 import { useAppStore } from "@/store";
 import { Button } from "@/components/ui/button";
 import { DottedGlowBackground } from "@/components/ui/dotted-glow-background";
 import appIconUrl from "../../../resources/icon.svg?url";
+import { toggleAppTheme } from "@/lib/theme";
 
 export function WelcomeScreen() {
   const { recentRepos, openRepository, openRecentRepo } = useAppStore();
+  const [isDarkTheme, setIsDarkTheme] = useState(
+    () => document.documentElement.classList.contains("dark"),
+  );
+
+  const cycleTheme = useCallback(() => {
+    setIsDarkTheme(toggleAppTheme());
+  }, []);
 
   return (
     <div className="relative isolate flex min-h-0 flex-1 flex-col items-center overflow-hidden px-8 py-8 text-center">
+      <Button
+        type="button"
+        variant="ghost"
+        size="icon"
+        className="absolute left-4 top-4 z-20 shrink-0"
+        onClick={cycleTheme}
+        aria-label={isDarkTheme ? "Switch to light theme" : "Switch to dark theme"}
+      >
+        {isDarkTheme ? (
+          <Sun className="size-4 shrink-0" />
+        ) : (
+          <Moon className="size-4 shrink-0" />
+        )}
+      </Button>
       <DottedGlowBackground
-        className="pointer-events-none mask-radial-to-90% mask-radial-at-center opacity-20 dark:opacity-100"
+        className="pointer-events-none mask-radial-to-90% mask-radial-at-center opacity-[0.55] dark:opacity-100"
         gap={20}
-        radius={1}
-        opacity={0.55}
-        colorLightVar="muted-foreground"
+        radius={1.25}
+        opacity={0.65}
+        colorLightVar="foreground"
         colorDarkVar="muted-foreground"
-        glowColor="rgba(56, 189, 248, 0.75)"
+        glowColor="rgba(15, 23, 42, 0.35)"
         darkGlowColor="rgba(125, 211, 252, 0.85)"
       />
       <div className="relative z-10 flex min-h-0 flex-1 flex-col items-center justify-center gap-0">
@@ -24,7 +47,7 @@ export function WelcomeScreen() {
           <img
             src={appIconUrl}
             alt=""
-            className="size-16 object-contain"
+            className="size-16 object-contain invert dark:invert-0"
             draggable={false}
           />
         </div>

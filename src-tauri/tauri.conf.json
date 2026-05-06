@@ -37,7 +37,7 @@
   },
   "plugins": {
     "updater": {
-      "pubkey": "",
+      "pubkey": "untrusted comment: minisign public key: 3CEB4C3816BB677\nRWR3tmuBw7TOA/fl4ld44Iq//YgWkha0pUlkt3n5e0KBtJxqbRAsDulI",
       "endpoints": [
         "https://github.com/YOUR_ORG/YOUR_REPO/releases/latest/download/latest.json"
       ]

@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { LoadingSpinner } from "@/components/common/LoadingSpinner";
 import { FileEditor } from "./FileEditor";
+import { rehypeHexColorSwatch } from "@/lib/rehype-hex-color-swatch";
 
 type MetadataEntry = {
   key: string;
@@ -311,6 +312,7 @@ export function MarkdownViewer() {
                 )}
                 <ReactMarkdown
                   remarkPlugins={[remarkGfm]}
+                  rehypePlugins={[rehypeHexColorSwatch]}
                   components={markdownComponents}
                 >
                   {previewBody}

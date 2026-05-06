@@ -25,10 +25,7 @@ function App() {
 
   const showTopBar = Boolean(repoPath && scanResult);
 
-  const showSkillNavigator =
-    selectedItem?.type === "skill" &&
-    ((selectedItem.skill?.folders.length ?? 0) > 0 ||
-      (selectedItem.skill?.root_files.length ?? 0) > 0);
+  const showSkillNavigator = selectedItem?.type === "skill";
 
   return (
     <TooltipProvider>

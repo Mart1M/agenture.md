@@ -58,7 +58,99 @@ fn is_inside_skill_container(relative: &str) -> bool {
     relative == "skills" || relative.starts_with("skills/") || relative.contains("/skills/")
 }
 
-/// Scan a skill directory for sub-folders and their .md files
+fn skill_folder_rel_path(skill_dir: &Path, folder_abs: &Path) -> String {
+    folder_abs
+        .strip_prefix(skill_dir)
+        .unwrap_or(folder_abs)
+        .to_string_lossy()
+        .replace('\\', "/")
+        .trim_matches('/')
+        .to_string()
+}
+
+/// Recursively scan one skill sub-folder: `.md` files here + nested directories.
+fn scan_skill_folder(
+    repo_root: &Path,
+    skill_dir: &Path,
+    folder_abs: &Path,
+    readme_filename: &str,
+) -> SkillFolder {
+    let rel_path = skill_folder_rel_path(skill_dir, folder_abs);
+    let name = folder_abs
+        .file_name()
+        .map(|n| n.to_string_lossy().to_string())
+        .unwrap_or_default();
+
+    let mut files: Vec<SkillFile> = Vec::new();
+    let mut folders: Vec<SkillFolder> = Vec::new();
+
+    let entries = match std::fs::read_dir(folder_abs) {
+        Ok(e) => e,
+        Err(_) => {
+            return SkillFolder {
+                name,
+                rel_path,
+                files,
+                folders,
+            };
+        }
+    };
+
+    let mut dir_entries: Vec<_> = entries.flatten().collect();
+    dir_entries.sort_by_key(|e| e.file_name());
+
+    for entry in dir_entries {
+        let path = entry.path();
+        let entry_name = entry.file_name().to_string_lossy().to_string();
+
+        if path.is_dir() {
+            if SKIP_DIRS.contains(&entry_name.as_str()) {
+                continue;
+            }
+            folders.push(scan_skill_folder(
+                repo_root,
+                skill_dir,
+                &path,
+                readme_filename,
+            ));
+        } else if path.is_file() {
+            let ext = path
+                .extension()
+                .map(|e| e.to_string_lossy().to_string())
+                .unwrap_or_default();
+            if ext == "md" && entry_name != readme_filename {
+                let raw_name = path
+                    .file_stem()
+                    .map(|s| s.to_string_lossy().to_string())
+                    .unwrap_or_default();
+                let rel = path
+                    .strip_prefix(repo_root)
+                    .unwrap_or(&path)
+                    .to_string_lossy()
+                    .to_string();
+                let size = entry.metadata().map(|m| m.len()).unwrap_or(0);
+                files.push(SkillFile {
+                    raw_name,
+                    path: path.to_string_lossy().to_string(),
+                    relative_path: rel,
+                    size_bytes: size,
+                });
+            }
+        }
+    }
+
+    folders.sort_by(|a, b| a.name.cmp(&b.name));
+    files.sort_by(|a, b| a.raw_name.cmp(&b.raw_name));
+
+    SkillFolder {
+        name,
+        rel_path,
+        files,
+        folders,
+    }
+}
+
+/// Scan a skill directory for sub-folders (recursive) and root-level `.md` files
 fn scan_skill_directory(
     repo_root: &Path,
     skill_dir: &Path,
@@ -80,44 +172,15 @@ fn scan_skill_directory(
         let name = entry.file_name().to_string_lossy().to_string();
 
         if path.is_dir() {
-            // Collect .md files inside this sub-folder (1 level deep)
-            let mut files: Vec<SkillFile> = Vec::new();
-            if let Ok(sub_entries) = std::fs::read_dir(&path) {
-                let mut sub: Vec<_> = sub_entries.flatten().collect();
-                sub.sort_by_key(|e| e.file_name());
-                for sub_entry in sub {
-                    let sub_path = sub_entry.path();
-                    if !sub_path.is_file() {
-                        continue;
-                    }
-                    let ext = sub_path
-                        .extension()
-                        .map(|e| e.to_string_lossy().to_string())
-                        .unwrap_or_default();
-                    if ext != "md" {
-                        continue;
-                    }
-                    let raw_name = sub_path
-                        .file_stem()
-                        .map(|s| s.to_string_lossy().to_string())
-                        .unwrap_or_default();
-                    let rel = sub_path
-                        .strip_prefix(repo_root)
-                        .unwrap_or(&sub_path)
-                        .to_string_lossy()
-                        .to_string();
-                    let size = sub_entry.metadata().map(|m| m.len()).unwrap_or(0);
-                    files.push(SkillFile {
-                        raw_name,
-                        path: sub_path.to_string_lossy().to_string(),
-                        relative_path: rel,
-                        size_bytes: size,
-                    });
-                }
+            if SKIP_DIRS.contains(&name.as_str()) {
+                continue;
             }
-            if !files.is_empty() {
-                folders.push(SkillFolder { name, files });
-            }
+            folders.push(scan_skill_folder(
+                repo_root,
+                skill_dir,
+                &path,
+                readme_filename,
+            ));
         } else if path.is_file() {
             let ext = path
                 .extension()
@@ -143,6 +206,9 @@ fn scan_skill_directory(
             }
         }
     }
+
+    folders.sort_by(|a, b| a.name.cmp(&b.name));
+    root_files.sort_by(|a, b| a.raw_name.cmp(&b.raw_name));
 
     (folders, root_files)
 }

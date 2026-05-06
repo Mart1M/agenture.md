@@ -7,6 +7,7 @@ import { SetupCTA } from "@/components/setup/SetupCTA";
 import { SkillsPage } from "@/components/skills/SkillsPage";
 import { TerminalView } from "@/components/terminal/TerminalView";
 import { MCPView } from "@/components/mcp/MCPView";
+import { GitGraphView } from "@/components/git/GitGraphView";
 import { LoadingSpinner } from "@/components/common/LoadingSpinner";
 import { cn } from "@/lib/utils";
 
@@ -85,6 +86,14 @@ export function MainPanel() {
 
   if (currentView === "terminal") {
     return mainWithPersistentTerminals(null);
+  }
+
+  if (currentView === "git") {
+    return mainWithPersistentTerminals(
+      <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+        <GitGraphView />
+      </div>,
+    );
   }
 
   if (currentView === "mcp") {
