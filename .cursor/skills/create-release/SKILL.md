@@ -19,7 +19,7 @@ disable-model-invocation: true
    (adapter le chemin). Une seule chaîne base64 dans le JSON, sans espaces ni retours ligne.
 3. **Secrets GitHub** (Settings → Secrets and variables → Actions) :
    - `TAURI_SIGNING_PRIVATE_KEY` : contenu **complet** du fichier `.key` (multiligne).
-   - Si la clé **n’a pas** de mot de passe : **ne pas** définir `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` (ou le supprimer). Sinon : `incorrect updater private key password`.
+   - `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` : **à supprimer** si la clé a été générée avec un mot de passe vide (`tauri signer generate … --password ''`). Tauri utilise le format **rsign** : la clé reste libellée « encrypted » mais sans passphrase ; si ce secret existe avec une valeur erronée, le build échoue. En **local**, pour éviter le prompt interactif : exporter `TAURI_SIGNING_PRIVATE_KEY_PASSWORD=` (vide) ou utiliser `pnpm run tauri:build:signed`.
 4. **Permissions** : Settings → Actions → General → Workflow permissions → **Read and write**.
 
 ## Déclencher la release
