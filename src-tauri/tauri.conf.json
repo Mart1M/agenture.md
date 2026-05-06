@@ -37,7 +37,7 @@
   },
   "plugins": {
     "updater": {
-      "pubkey": "untrusted comment: minisign public key: C5050B6864E9819B\nRWSbgelkaAsFxR0jlWU3/NgN2UrifXpuINAjJ22T5QsXaIhtRFnfqik4",
+      "pubkey": "RWSbgelkaAsFxR0jlWU3/NgN2UrifXpuINAjJ22T5QsXaIhtRFnfqik4",
       "endpoints": [
         "https://github.com/Mart1M/agenture.app/releases/latest/download/latest.json"
       ]
