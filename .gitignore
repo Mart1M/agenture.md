@@ -28,3 +28,4 @@ src-tauri/signing/*.key
 
 # Claude Code worktrees (temporary git worktrees created during sessions)
 .claude/worktrees/
+.claude/settings.local.json
