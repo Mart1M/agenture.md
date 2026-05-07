@@ -3,7 +3,7 @@ use std::process::Command;
 
 use crate::types::CommandOutput;
 
-const ALLOWED_PREFIXES: &[&str] = &["agenture-cli", "skills"];
+const ALLOWED_PACKAGES: &[&str] = &["agenture-cli", "skills"];
 
 #[tauri::command]
 pub fn run_cli_command(
@@ -24,7 +24,7 @@ pub fn run_cli_command(
         .find(|arg| !arg.starts_with('-'))
         .ok_or_else(|| "No package provided".to_string())?;
 
-    if !ALLOWED_PREFIXES.iter().any(|p| package_arg.starts_with(p)) {
+    if !ALLOWED_PACKAGES.contains(&package_arg.as_str()) {
         return Err(format!("Package not allowed: {}", package_arg));
     }
 

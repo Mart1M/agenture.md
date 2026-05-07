@@ -37,28 +37,37 @@ function getJsonPreview(value: string) {
 
 function extractMetadata(content: string): MetadataPreview {
   const lines = content.split("\n");
-  const entries: MetadataEntry[] = [];
-  let bodyStart = 0;
-  let start = 0;
 
+  // YAML front matter block (--- ... ---)
   if (lines[0]?.trim() === "---") {
-    start = 1;
     const end = lines.findIndex(
       (line, index) => index > 0 && line.trim() === "---",
     );
     if (end === -1) return { entries: [], body: content };
-    bodyStart = end + 1;
-  }
 
-  for (let index = start; index < lines.length; index++) {
-    const line = lines[index];
-    const match = line.match(/^([A-Za-z][\w-]*):\s*(.*)$/);
-
-    if (!match) {
-      bodyStart = start === 0 ? index : bodyStart;
-      break;
+    const entries: MetadataEntry[] = [];
+    for (let i = 1; i < end; i++) {
+      // Only extract simple top-level key: value pairs (not nested YAML)
+      const match = lines[i].match(/^([A-Za-z][\w-]*):\s*(.+)$/);
+      if (match) entries.push({ key: match[1], value: match[2].trim() });
     }
 
+    return {
+      entries,
+      body: lines.slice(end + 1).join("\n").trimStart(),
+    };
+  }
+
+  // Simple key: value header (no --- fences)
+  const entries: MetadataEntry[] = [];
+  let bodyStart = 0;
+  for (let index = 0; index < lines.length; index++) {
+    const line = lines[index];
+    const match = line.match(/^([A-Za-z][\w-]*):\s*(.*)$/);
+    if (!match) {
+      bodyStart = index;
+      break;
+    }
     entries.push({ key: match[1], value: match[2] });
     bodyStart = index + 1;
   }

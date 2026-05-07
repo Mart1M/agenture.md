@@ -84,6 +84,124 @@ import {
 } from "@/components/ui/command";
 import { Kbd, KbdGroup } from "@/components/ui/kbd";
 
+const DESIGN_MD_TEMPLATE = `---
+version: "alpha"
+name: My Design System
+description: Visual identity for this project
+
+colors:
+  primary: "#000000"
+  secondary: "#FFFFFF"
+  accent: "#0066CC"
+  neutral: "#6B7280"
+  surface: "#F9FAFB"
+  on-primary: "#FFFFFF"
+
+typography:
+  h1:
+    fontFamily: "Inter"
+    fontSize: "2rem"
+    fontWeight: 700
+    lineHeight: 1.2
+  h2:
+    fontFamily: "Inter"
+    fontSize: "1.5rem"
+    fontWeight: 600
+    lineHeight: 1.3
+  body:
+    fontFamily: "Inter"
+    fontSize: "1rem"
+    fontWeight: 400
+    lineHeight: 1.6
+  label:
+    fontFamily: "Inter"
+    fontSize: "0.875rem"
+    fontWeight: 500
+    lineHeight: 1.4
+
+rounded:
+  sm: "4px"
+  md: "8px"
+  lg: "16px"
+  full: "9999px"
+
+spacing:
+  xs: "4px"
+  sm: "8px"
+  md: "16px"
+  lg: "24px"
+  xl: "40px"
+
+components:
+  button-primary:
+    backgroundColor: "{colors.primary}"
+    textColor: "{colors.on-primary}"
+    rounded: "{rounded.md}"
+    padding: "10px 20px"
+  button-secondary:
+    backgroundColor: "transparent"
+    textColor: "{colors.primary}"
+    rounded: "{rounded.md}"
+    padding: "10px 20px"
+---
+
+## Overview
+
+[Describe your design philosophy and visual direction. What feeling should the UI convey? What are the core principles?]
+
+## Colors
+
+[Describe each color token and its role in the interface.]
+
+- **Primary** (\`#000000\`): Main brand color, used for CTAs, active states, and key UI elements.
+- **Secondary** (\`#FFFFFF\`): Background and inverse surfaces.
+- **Accent** (\`#0066CC\`): Interactive highlights, links, and focus states.
+- **Neutral** (\`#6B7280\`): Text, borders, and subtle backgrounds.
+- **Surface** (\`#F9FAFB\`): Page and card backgrounds.
+
+## Typography
+
+[Describe the font families and when to use each text style.]
+
+Use **Inter** as the primary typeface. Reserve \`h1\` for page titles, \`h2\` for section headings, \`body\` for all running text, and \`label\` for form labels and captions.
+
+## Layout
+
+[Describe spacing scale, grid, and composition principles.]
+
+Follow the spacing scale defined in the tokens. Components should use \`sm\` padding for compact elements and \`md\`/\`lg\` for spacious layouts.
+
+## Elevation & Depth
+
+[Describe shadow strategy and layering.]
+
+Use minimal elevation: flat surfaces for most components, subtle shadows (\`0 1px 3px rgba(0,0,0,0.1)\`) for cards and dropdowns.
+
+## Shapes
+
+[Describe border radius usage.]
+
+Prefer \`md\` (8px) for cards and buttons, \`sm\` (4px) for inputs and badges, and \`full\` for pills and avatars.
+
+## Components
+
+[Describe component-level styling guidelines.]
+
+Buttons use solid fills for primary actions and outlined/ghost variants for secondary actions. Maintain consistent padding and rounded values across all interactive elements.
+
+## Do's and Don'ts
+
+**Do:**
+- Maintain color contrast ratios ≥ 4.5:1 for text
+- Use spacing tokens instead of arbitrary pixel values
+- Reference tokens using \`{path.to.token}\` syntax
+
+**Don't:**
+- Use colors outside the defined palette
+- Mix font families without adding them to the \`typography\` tokens
+- Override spacing with hardcoded values
+`;
+
 const PINNED_AGENT_ORDER = ["CLAUDE", "AGENTS", "DESIGN"] as const;
 
 function normPath(p: string) {
@@ -182,7 +300,8 @@ export function AppSidebar() {
     rescan,
   } = useAppStore();
   const [isCreateAgentOpen, setIsCreateAgentOpen] = useState(false);
-  const [newAgentName, setNewAgentName] = useState("");
+  const [isCreateCustomAgentOpen, setIsCreateCustomAgentOpen] = useState(false);
+  const [newCustomAgentName, setNewCustomAgentName] = useState("");
   const [createAgentError, setCreateAgentError] = useState<string | null>(null);
   const [isCreatingAgent, setIsCreatingAgent] = useState(false);
   const [isCreateSkillOpen, setIsCreateSkillOpen] = useState(false);
@@ -341,16 +460,29 @@ export function AppSidebar() {
     setCurrentView(view);
   }
 
-  async function handleCreateAgentFile() {
+  async function handleCreateDesignMd() {
     if (!repoPath) return;
-    const baseName = newAgentName.trim().replace(/\.md$/i, "");
-    if (!baseName) {
-      setCreateAgentError("Please enter a file name.");
-      return;
+    const filePath = `${repoPath}/DESIGN.md`;
+    setIsCreatingAgent(true);
+    setCreateAgentError(null);
+    try {
+      await invoke("write_file", {
+        filePath,
+        content: DESIGN_MD_TEMPLATE,
+        repoPath,
+      });
+      setIsCreateAgentOpen(false);
+      void rescan();
+    } catch (error) {
+      setCreateAgentError(String(error));
+    } finally {
+      setIsCreatingAgent(false);
     }
+  }
 
-    const fileName = `${baseName}.md`;
-    const filePath = `${repoPath}/${fileName}`;
+  async function handleCreateAgentsMd() {
+    if (!repoPath) return;
+    const filePath = `${repoPath}/AGENTS.md`;
     setIsCreatingAgent(true);
     setCreateAgentError(null);
     try {
@@ -359,12 +491,50 @@ export function AppSidebar() {
         content: "",
         repoPath,
       });
-      const result = await invoke<RepoScanResult>("scan_repository", {
+      setIsCreateAgentOpen(false);
+      void rescan();
+    } catch (error) {
+      setCreateAgentError(String(error));
+    } finally {
+      setIsCreatingAgent(false);
+    }
+  }
+
+  async function handleCreateCustomAgent() {
+    if (!repoPath) return;
+    const baseName = newCustomAgentName.trim().replace(/\.md$/i, "");
+    if (!baseName) {
+      setCreateAgentError("Please enter an agent name.");
+      return;
+    }
+
+    const filePath = `${repoPath}/.agents/${baseName}.md`;
+    setIsCreatingAgent(true);
+    setCreateAgentError(null);
+    try {
+      // Ensure the .agents folder exists for custom agents.
+      try {
+        await invoke("create_directory", {
+          directoryPath: `${repoPath}/.agents`,
+          repoPath,
+        });
+      } catch {
+        // Ignore if it already exists.
+      }
+
+      await invoke("write_file", {
+        filePath,
+        content: "",
         repoPath,
       });
-      setScanResult(result);
+      setIsCreateCustomAgentOpen(false);
       setIsCreateAgentOpen(false);
-      setNewAgentName("");
+      setNewCustomAgentName("");
+      void rescan();
+      showToast({
+        title: "Custom agent created",
+        description: `.agents/${baseName}.md`,
+      });
     } catch (error) {
       setCreateAgentError(String(error));
     } finally {
@@ -923,7 +1093,7 @@ export function AppSidebar() {
               variant="outline"
               onClick={() => {
                 setCreateAgentError(null);
-                setNewAgentName("");
+                setNewCustomAgentName("");
                 setIsCreateAgentOpen(true);
               }}
               disabled={!repoPath}
@@ -1039,31 +1209,76 @@ export function AppSidebar() {
       </Dialog>
 
       <Dialog open={isCreateAgentOpen} onOpenChange={setIsCreateAgentOpen}>
-        <DialogContent className="sm:max-w-sm">
+        <DialogContent className="sm:max-w-3xl">
           <DialogHeader>
-            <DialogTitle>Create agent</DialogTitle>
+            <DialogTitle>Create agent file</DialogTitle>
             <DialogDescription>
-              Enter a file name. <code className="font-mono">.md</code> will be
-              added automatically.
+              Choose the type of agent file to create.
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-2">
-            <Input
-              placeholder="e.g. TEAM_AGENT"
-              value={newAgentName}
-              onChange={(e) => setNewAgentName(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") {
-                  e.preventDefault();
-                  void handleCreateAgentFile();
-                }
+          <div className="grid grid-cols-1 gap-3 py-2 sm:grid-cols-3">
+            <button
+              type="button"
+              className={cn(
+                "flex flex-col gap-2 rounded-lg border border-border p-4 text-left transition-colors",
+                "hover:border-foreground/40 hover:bg-accent",
+                "disabled:pointer-events-none disabled:opacity-50",
+              )}
+              onClick={() => void handleCreateDesignMd()}
+              disabled={isCreatingAgent}
+            >
+              <Palette className="h-5 w-5 text-muted-foreground" />
+              <div>
+                <p className="text-sm font-medium">DESIGN.md</p>
+                <p className="text-xs text-muted-foreground">
+                  Pre-filled design system template (Google Stitch format)
+                </p>
+              </div>
+            </button>
+            <button
+              type="button"
+              className={cn(
+                "flex flex-col gap-2 rounded-lg border border-border p-4 text-left transition-colors",
+                "hover:border-foreground/40 hover:bg-accent",
+                "disabled:pointer-events-none disabled:opacity-50",
+              )}
+              onClick={() => void handleCreateAgentsMd()}
+              disabled={isCreatingAgent}
+            >
+              <FilePlus2 className="h-5 w-5 text-muted-foreground" />
+              <div>
+                <p className="text-sm font-medium">AGENTS.md</p>
+                <p className="text-xs text-muted-foreground">
+                  Blank agent file for coding assistant instructions
+                </p>
+              </div>
+            </button>
+            <button
+              type="button"
+              className={cn(
+                "flex flex-col gap-2 rounded-lg border border-border p-4 text-left transition-colors",
+                "hover:border-foreground/40 hover:bg-accent",
+                "disabled:pointer-events-none disabled:opacity-50",
+              )}
+              onClick={() => {
+                setCreateAgentError(null);
+                setNewCustomAgentName("");
+                setIsCreateCustomAgentOpen(true);
               }}
               disabled={isCreatingAgent}
-            />
-            {createAgentError && (
-              <p className="text-xs text-destructive">{createAgentError}</p>
-            )}
+            >
+              <Bot className="h-5 w-5 text-muted-foreground" />
+              <div>
+                <p className="text-sm font-medium">Custom agent</p>
+                <p className="text-xs text-muted-foreground">
+                  Create <code className="font-mono">.agents/&lt;name&gt;.md</code>
+                </p>
+              </div>
+            </button>
           </div>
+          {createAgentError && (
+            <p className="text-xs text-destructive">{createAgentError}</p>
+          )}
           <DialogFooter>
             <Button
               variant="outline"
@@ -1072,9 +1287,58 @@ export function AppSidebar() {
             >
               Cancel
             </Button>
-            <Button
-              onClick={() => void handleCreateAgentFile()}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={isCreateCustomAgentOpen}
+        onOpenChange={(open) => {
+          setIsCreateCustomAgentOpen(open);
+          if (!open) {
+            setNewCustomAgentName("");
+            setCreateAgentError(null);
+          }
+        }}
+      >
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Create custom agent</DialogTitle>
+            <DialogDescription>
+              Enter a name. The file will be created in{" "}
+              <code className="font-mono">.agents/</code> with{" "}
+              <code className="font-mono">.md</code> appended automatically.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2">
+            <Input
+              placeholder="e.g. team-assistant"
+              value={newCustomAgentName}
+              onChange={(e) => setNewCustomAgentName(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  void handleCreateCustomAgent();
+                }
+              }}
               disabled={isCreatingAgent}
+              autoFocus
+            />
+            {createAgentError && (
+              <p className="text-xs text-destructive">{createAgentError}</p>
+            )}
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setIsCreateCustomAgentOpen(false)}
+              disabled={isCreatingAgent}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={() => void handleCreateCustomAgent()}
+              disabled={isCreatingAgent || !newCustomAgentName.trim()}
             >
               Create
             </Button>

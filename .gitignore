@@ -25,3 +25,6 @@ dist-ssr
 
 # Tauri updater — private key only (pubkey is in tauri.conf.json)
 src-tauri/signing/*.key
+
+# Claude Code worktrees (temporary git worktrees created during sessions)
+.claude/worktrees/

@@ -45,7 +45,7 @@ const LOGOS: Record<string, string> = {
   mistral: "/tools/mistralai.svg",
   "amazon-q": "/tools/aws.svg",
   continue: "/tools/continue.svg",
-  copilot: "/tools/github.svg",
+  copilot: "/tools/githubcopilot.svg",
   codeium: "/tools/windsurf.svg",
   cursor: "/tools/cursor.svg",
 };

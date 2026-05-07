@@ -99,6 +99,26 @@ function TerminalSessionPane({
     terminalRef.current = terminal;
     fitAddonRef.current = fitAddon;
 
+    // Ensure Shift+Enter is forwarded distinctly (not collapsed to Enter).
+    // Some CLI apps (Claude Code, etc.) rely on this to insert a newline
+    // instead of submitting the prompt.
+    terminal.attachCustomKeyEventHandler((event) => {
+      if (
+        event.type === "keydown" &&
+        event.key === "Enter" &&
+        event.shiftKey &&
+        !event.altKey &&
+        !event.ctrlKey &&
+        !event.metaKey
+      ) {
+        event.preventDefault();
+        const bytes = Array.from(new TextEncoder().encode("\u001b[13;2u"));
+        invoke("write_terminal", { sessionId, data: bytes }).catch(() => {});
+        return false;
+      }
+      return true;
+    });
+
     const syncTerminalTheme = () => {
       terminal.options.theme = buildTerminalTheme();
       terminal.refresh(0, Math.max(0, terminal.rows - 1));

@@ -38,8 +38,14 @@ import { HighlightStyle, syntaxHighlighting } from "@codemirror/language";
 import { tags } from "@lezer/highlight";
 import { useAppStore } from "@/store";
 import { Button } from "@/components/ui/button";
+import { Separator } from "@/components/ui/separator";
 import { Kbd } from "@/components/ui/kbd";
 import { showToast } from "@/components/common/Toaster";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 const markdownHighlightStyle = HighlightStyle.define([
   {
@@ -126,9 +132,21 @@ const editorTheme = EditorView.theme({
     lineHeight: "1.45",
     color: "var(--muted-foreground)",
   },
-  ".cm-frontmatter-line .tok-heading": {
-    fontSize: "12px",
-    fontWeight: "500",
+  ".cm-frontmatter-line *": {
+    fontSize: "12px !important",
+    fontWeight: "400 !important",
+    fontStyle: "normal !important",
+    color: "var(--muted-foreground) !important",
+    backgroundColor: "transparent !important",
+    textDecoration: "none !important",
+  },
+  ".cm-frontmatter-line span[class]": {
+    fontSize: "12px !important",
+    fontWeight: "400 !important",
+    fontStyle: "normal !important",
+    color: "var(--muted-foreground) !important",
+    backgroundColor: "transparent !important",
+    textDecoration: "none !important",
   },
 });
 
@@ -179,10 +197,88 @@ type ToolbarAction = {
   action: () => void;
 };
 
+type SkillFrontmatter = {
+  entries: Array<{ key: string; value: string }>;
+  body: string;
+};
+
 function formatTokenCount(chars: number): string {
   const tokens = Math.round(chars / 4);
   if (tokens >= 1000) return `≈ ${(tokens / 1000).toFixed(1)}k tokens`;
   return `≈ ${tokens} tokens`;
+}
+
+function estimateTokens(input: string): number {
+  return Math.round(input.length / 4);
+}
+
+function extractSkillFrontmatter(content: string): SkillFrontmatter {
+  const lines = content.split("\n");
+  if (lines[0]?.trim() !== "---") {
+    return { entries: [], body: content };
+  }
+  const end = lines.findIndex(
+    (line, index) => index > 0 && line.trim() === "---",
+  );
+  if (end < 0) {
+    return { entries: [], body: content };
+  }
+  const entries: Array<{ key: string; value: string }> = [];
+  for (let i = 1; i < end; i++) {
+    const match = lines[i].match(/^([A-Za-z][\w-]*):\s*(.*)$/);
+    if (!match) continue;
+    entries.push({ key: match[1].toLowerCase(), value: match[2] });
+  }
+  return {
+    entries,
+    body: lines
+      .slice(end + 1)
+      .join("\n")
+      .trimStart(),
+  };
+}
+
+function TinyTokenGauge({ value, limit }: { value: number; limit: number }) {
+  const size = 16;
+  const stroke = 2;
+  const radius = (size - stroke) / 2;
+  const circumference = 2 * Math.PI * radius;
+  const ratio = Math.min(value / limit, 1);
+  const dash = ratio * circumference;
+  const usage = value / limit;
+  const progressClass =
+    usage < 0.6
+      ? "stroke-emerald-500"
+      : usage < 0.8
+        ? "stroke-lime-500"
+        : usage < 0.95
+          ? "stroke-amber-500"
+          : usage <= 1
+            ? "stroke-orange-500"
+            : "stroke-destructive";
+
+  return (
+    <svg width={size} height={size} className="-rotate-90">
+      <circle
+        cx={size / 2}
+        cy={size / 2}
+        r={radius}
+        fill="none"
+        className="stroke-border"
+        strokeWidth={stroke}
+      />
+      <circle
+        cx={size / 2}
+        cy={size / 2}
+        r={radius}
+        fill="none"
+        strokeWidth={stroke}
+        strokeLinecap="round"
+        className={progressClass}
+        strokeDasharray={`${dash} ${circumference - dash}`}
+      />
+    </svg>
+  );
 }
 
 export function FileEditor() {
@@ -280,6 +376,26 @@ export function FileEditor() {
   }, [editContent]);
 
   if (!viewerFile || editContent === null) return null;
+  const isSkillReadme = /(^|\/)skills?\.md$/i.test(viewerFile.relative_path);
+  const isAgentsMd = /(^|\/)agents\.md$/i.test(viewerFile.relative_path);
+  const frontmatter = isSkillReadme
+    ? extractSkillFrontmatter(editContent)
+    : { entries: [], body: editContent };
+  const frontmatterName =
+    frontmatter.entries.find((e) => e.key === "name")?.value ?? "";
+  const frontmatterDescription =
+    frontmatter.entries.find((e) => e.key === "description")?.value ?? "";
+  const metadataTokens = estimateTokens(
+    `${frontmatterName}\n${frontmatterDescription}`.trim(),
+  );
+  const skillBodyTokens = estimateTokens(frontmatter.body);
+  const skillLineCount = frontmatter.body.split("\n").length;
+  const metadataRatio = metadataTokens / 100;
+  const skillRatio = skillBodyTokens / 5000;
+  const linesRatio = skillLineCount / 500;
+  const overallRatio = Math.max(metadataRatio, skillRatio, linesRatio);
+  const agentsLineCount = editContent.split("\n").length;
+  const agentsLineRatio = agentsLineCount / 200;
 
   function focusEditor(view: EditorView) {
     window.requestAnimationFrame(() => view.focus());
@@ -483,9 +599,82 @@ export function FileEditor() {
             </Button>
           ))}
           <div className="mx-1 h-6 w-px bg-border" />
-          <span className="px-2 text-xs text-muted-foreground whitespace-nowrap">
+          <span className="pl-2 text-xs text-muted-foreground whitespace-nowrap">
             {formatTokenCount(editContent.length)}
           </span>
+          {(isSkillReadme || isAgentsMd) && (
+            <>
+              <Tooltip>
+                <TooltipTrigger
+                  render={
+                    <button
+                      type="button"
+                      className="inline-flex h-6 w-6 items-center justify-center rounded-full text-muted-foreground hover:bg-accent/50"
+                      aria-label={
+                        isSkillReadme
+                          ? "Skill token budget details"
+                          : "AGENTS.md size details"
+                      }
+                    />
+                  }
+                >
+                  <TinyTokenGauge
+                    value={Math.round(
+                      (isSkillReadme ? overallRatio : agentsLineRatio) * 100,
+                    )}
+                    limit={100}
+                  />
+                </TooltipTrigger>
+                <TooltipContent
+                  side="top"
+                  className="max-w-sm border bg-background p-3 text-xs leading-5 text-foreground shadow-lg [--tooltip-bg:var(--background)]"
+                >
+                  {isSkillReadme ? (
+                    <div className="space-y-2">
+                      <p className="text-[11px] font-semibold">
+                        Skill size details
+                      </p>
+                      <div className="space-y-1">
+                        <p>
+                          <span className="font-medium text-muted-foreground">
+                            Metadata:
+                          </span>
+                        </p>
+                        <p className="font-medium">{metadataTokens}/100 tokens</p>
+                      </div>
+                      <Separator />
+                      <div className="space-y-1">
+                        <p>
+                          <span className="font-medium text-muted-foreground">
+                            Body:
+                          </span>
+                        </p>
+                        <p className="font-medium">
+                          {skillBodyTokens}/5000 tokens
+                        </p>
+                        <p>
+                          <span className="font-medium">Lines:</span>{" "}
+                          {skillLineCount}/500
+                        </p>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="space-y-1">
+                      <p className="text-[11px] font-semibold">
+                        AGENTS.md size details
+                      </p>
+                      <p>
+                        <span className="font-medium text-muted-foreground">
+                          Lines:
+                        </span>{" "}
+                        <span className="font-medium">{agentsLineCount}/200</span>
+                      </p>
+                    </div>
+                  )}
+                </TooltipContent>
+              </Tooltip>
+            </>
+          )}
           <div className="mx-1 h-6 w-px bg-border" />
           {isDirty ? (
             <span className="px-2 text-xs text-muted-foreground whitespace-nowrap">
