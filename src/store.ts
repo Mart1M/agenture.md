@@ -29,7 +29,7 @@ function persistRecentRepo(path: string): string[] {
 }
 
 type ViewMode = "rendered" | "edit";
-type SidebarTab = "agents" | "skills";
+type SidebarTab = "agents" | "skills" | "memory";
 type CurrentView = "explorer" | "skills" | "terminal" | "mcp" | "git";
 
 export interface AiToolBasic {
@@ -44,6 +44,8 @@ export interface TerminalSessionInfo {
   tool: AiToolBasic;
   /** Working directory for spawn_terminal; when omitted, UI uses repo root */
   cwd?: string | null;
+  /** Text to write to the terminal after the process spawns (e.g. a slash command) */
+  initialInput?: string | null;
 }
 
 interface AppState {
@@ -80,6 +82,9 @@ interface AppState {
   terminalSessions: TerminalSessionInfo[];
   activeTerminalSessionId: string | null;
 
+  // Memory
+  selectedMemoryFolder: string | null;
+
   // Skills search
   skillQuery: string;
   skillResults: SkillSearchResult[];
@@ -99,10 +104,11 @@ interface AppState {
   setCurrentView: (view: CurrentView) => void;
   setIsTerminalDialogOpen: (v: boolean) => void;
   setTerminalDialogCallback: (cb: ((tool: AiToolBasic) => void) | null) => void;
-  addTerminalSession: (tool: AiToolBasic, cwd?: string | null) => string;
+  addTerminalSession: (tool: AiToolBasic, cwd?: string | null, initialInput?: string | null) => string;
   removeTerminalSession: (id: string) => void;
   replaceTerminalSession: (oldId: string, tool: AiToolBasic) => string;
   setActiveTerminalSessionId: (id: string) => void;
+  setSelectedMemoryFolder: (folder: string | null) => void;
   setSkillQuery: (query: string) => void;
   setSkillResults: (results: SkillSearchResult[]) => void;
   setIsSearchingSkills: (v: boolean) => void;
@@ -129,6 +135,7 @@ const initialState = {
   viewMode: "edit" as ViewMode,
   editContent: null,
   isDirty: false,
+  selectedMemoryFolder: null,
   skillQuery: "",
   skillResults: [],
   isSearchingSkills: false,
@@ -185,10 +192,10 @@ export const useAppStore = create<AppState>((set) => ({
   setIsTerminalDialogOpen: (v) => set({ isTerminalDialogOpen: v }),
   setTerminalDialogCallback: (cb) => set({ terminalDialogCallback: cb }),
 
-  addTerminalSession: (tool, cwd) => {
+  addTerminalSession: (tool, cwd, initialInput) => {
     const id = newSessionId();
     set((state) => ({
-      terminalSessions: [...state.terminalSessions, { id, tool, cwd: cwd ?? null }],
+      terminalSessions: [...state.terminalSessions, { id, tool, cwd: cwd ?? null, initialInput: initialInput ?? null }],
       activeTerminalSessionId: id,
     }));
     return id;
@@ -217,6 +224,7 @@ export const useAppStore = create<AppState>((set) => ({
 
   setActiveTerminalSessionId: (id) => set({ activeTerminalSessionId: id }),
 
+  setSelectedMemoryFolder: (folder) => set({ selectedMemoryFolder: folder }),
   setSkillQuery: (query) => set({ skillQuery: query }),
   setSkillResults: (results) => set({ skillResults: results }),
   setIsSearchingSkills: (v) => set({ isSearchingSkills: v }),

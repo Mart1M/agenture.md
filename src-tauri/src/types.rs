@@ -40,12 +40,36 @@ pub struct DetectedSkill {
     pub root_files: Vec<SkillFile>, // extra .md files at the skill root (not the readme)
 }
 
+/// A single file inside .memory/<category>/
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MemoryFile {
+    pub raw_name: String,
+    pub path: String,
+    pub relative_path: String,
+    pub size_bytes: u64,
+}
+
+/// A category folder inside .memory/ (context, decision, pattern, preference)
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MemoryFolder {
+    pub name: String,
+    pub files: Vec<MemoryFile>,
+}
+
+/// Scanned .memory/ directory
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MemoryScan {
+    pub index_file: Option<MemoryFile>,
+    pub folders: Vec<MemoryFolder>,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RepoScanResult {
     pub repo_path: String,
     pub agents: Vec<DetectedAgent>,
     pub skills: Vec<DetectedSkill>,
     pub has_agent_context: bool,
+    pub memory: Option<MemoryScan>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

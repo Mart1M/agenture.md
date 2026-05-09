@@ -7,6 +7,7 @@ import { AppSidebar } from "./components/layout/AppSidebar";
 import { TopBar } from "./components/layout/TopBar";
 import { MainPanel } from "./components/layout/MainPanel";
 import { SkillNavigator } from "./components/skills/SkillNavigator";
+import { MemoryNavigator } from "./components/memory/MemoryNavigator";
 import { TerminalDialog } from "./components/terminal/TerminalDialog";
 import { Toaster } from "./components/common/Toaster";
 
@@ -57,6 +58,7 @@ function App() {
           {showTopBar && <TopBar />}
           <div className="flex min-h-0 flex-1 flex-row overflow-hidden">
             {showSkillNavigator && <SkillNavigator />}
+            <MemoryNavigator />
             <MainPanel />
           </div>
         </SidebarInset>

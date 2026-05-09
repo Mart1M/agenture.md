@@ -1,7 +1,7 @@
 use std::path::Path;
 use walkdir::WalkDir;
 
-use crate::types::{DetectedAgent, DetectedSkill, RepoScanResult, SkillFile, SkillFolder};
+use crate::types::{DetectedAgent, DetectedSkill, MemoryFile, MemoryFolder, MemoryScan, RepoScanResult, SkillFile, SkillFolder};
 
 /// Directories scanned for agent .md / .mdc files
 const AGENT_DIRS: &[&str] = &[
@@ -213,6 +213,86 @@ fn scan_skill_directory(
     (folders, root_files)
 }
 
+const MEMORY_CATEGORIES: &[&str] = &["context", "decision", "pattern", "preference"];
+const MEMORY_EXTENSIONS: &[&str] = &["md", "mdc", "txt"];
+
+fn scan_memory(root: &Path) -> Option<MemoryScan> {
+    let memory_dir = root.join(".memory");
+    if !memory_dir.is_dir() {
+        return None;
+    }
+
+    // INDEX.md at root of .memory/
+    let index_path = memory_dir.join("INDEX.md");
+    let index_file = if index_path.is_file() {
+        let size = index_path.metadata().map(|m| m.len()).unwrap_or(0);
+        let relative = index_path
+            .strip_prefix(root)
+            .unwrap_or(&index_path)
+            .to_string_lossy()
+            .replace('\\', "/");
+        Some(MemoryFile {
+            raw_name: "INDEX.md".to_string(),
+            path: index_path.to_string_lossy().to_string(),
+            relative_path: relative,
+            size_bytes: size,
+        })
+    } else {
+        None
+    };
+
+    let mut folders = Vec::new();
+    for category in MEMORY_CATEGORIES {
+        let folder_path = memory_dir.join(category);
+        if !folder_path.is_dir() {
+            continue;
+        }
+        let mut files = Vec::new();
+        if let Ok(entries) = std::fs::read_dir(&folder_path) {
+            let mut sorted: Vec<_> = entries.filter_map(|e| e.ok()).collect();
+            sorted.sort_by_key(|e| e.file_name());
+            for entry in sorted {
+                let path = entry.path();
+                if !path.is_file() {
+                    continue;
+                }
+                let name = path
+                    .file_name()
+                    .map(|n| n.to_string_lossy().to_string())
+                    .unwrap_or_default();
+                if name.starts_with('.') {
+                    continue;
+                }
+                let ext = path
+                    .extension()
+                    .map(|e| e.to_string_lossy().to_string())
+                    .unwrap_or_default();
+                if !MEMORY_EXTENSIONS.contains(&ext.as_str()) {
+                    continue;
+                }
+                let size = path.metadata().map(|m| m.len()).unwrap_or(0);
+                let relative = path
+                    .strip_prefix(root)
+                    .unwrap_or(&path)
+                    .to_string_lossy()
+                    .replace('\\', "/");
+                files.push(MemoryFile {
+                    raw_name: name,
+                    path: path.to_string_lossy().to_string(),
+                    relative_path: relative,
+                    size_bytes: size,
+                });
+            }
+        }
+        folders.push(MemoryFolder {
+            name: category.to_string(),
+            files,
+        });
+    }
+
+    Some(MemoryScan { index_file, folders })
+}
+
 #[tauri::command]
 pub fn scan_repository(repo_path: String) -> Result<RepoScanResult, String> {
     let root = Path::new(&repo_path);
@@ -360,11 +440,13 @@ pub fn scan_repository(repo_path: String) -> Result<RepoScanResult, String> {
     skills.sort_by(|a, b| a.raw_name.cmp(&b.raw_name));
 
     let has_agent_context = !agents.is_empty() || !skills.is_empty();
+    let memory = scan_memory(root);
 
     Ok(RepoScanResult {
         repo_path,
         agents,
         skills,
         has_agent_context,
+        memory,
     })
 }

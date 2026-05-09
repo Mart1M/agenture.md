@@ -17,6 +17,12 @@ import {
   GitGraph,
   Search,
   FileText,
+  DatabaseZap,
+  BookOpen,
+  GitFork,
+  Shapes,
+  Sliders,
+  type LucideIcon,
 } from "lucide-react";
 import { invoke } from "@tauri-apps/api/core";
 import {
@@ -65,6 +71,7 @@ import { LoadingSpinner } from "@/components/common/LoadingSpinner";
 import type {
   FileItem,
   FileSearchHit,
+  MemoryFile,
   RepoScanResult,
   SkillFolder,
   ViewerFile,
@@ -202,6 +209,17 @@ Buttons use solid fills for primary actions and outlined/ghost variants for seco
 - Override spacing with hardcoded values
 `;
 
+const MEMORY_FOLDER_ICONS: Record<string, LucideIcon> = {
+  context: BookOpen,
+  decision: GitFork,
+  pattern: Shapes,
+  preference: Sliders,
+};
+
+function getMemoryFolderIcon(name: string): LucideIcon {
+  return MEMORY_FOLDER_ICONS[name.toLowerCase()] ?? DatabaseZap;
+}
+
 const PINNED_AGENT_ORDER = ["CLAUDE", "AGENTS", "DESIGN"] as const;
 
 function normPath(p: string) {
@@ -278,6 +296,7 @@ function getAgentIcon(rawName: string, relativePath?: string) {
   return <Bot className="h-3.5 w-3.5 shrink-0" />;
 }
 
+
 export function AppSidebar() {
   const {
     scanResult,
@@ -298,7 +317,11 @@ export function AppSidebar() {
     setIsLoadingFile,
     setScanResult,
     rescan,
+    selectedMemoryFolder,
+    setSelectedMemoryFolder,
   } = useAppStore();
+
+  const memory = scanResult?.memory ?? null;
   const [isCreateAgentOpen, setIsCreateAgentOpen] = useState(false);
   const [isCreateCustomAgentOpen, setIsCreateCustomAgentOpen] = useState(false);
   const [newCustomAgentName, setNewCustomAgentName] = useState("");
@@ -450,6 +473,17 @@ export function AppSidebar() {
         item.type === "skill"
           ? item.skill!.readme_relative
           : item.relative_path,
+    });
+  }
+
+  async function openMemoryFile(file: MemoryFile) {
+    setCurrentView("explorer");
+    selectItem(null);
+    setSelectedMemoryFolder(null);
+    await loadFile(file.path, {
+      name: file.raw_name,
+      path: file.path,
+      relative_path: file.relative_path,
     });
   }
 
@@ -899,34 +933,52 @@ export function AppSidebar() {
               <SidebarGroupContent>
                 <Tabs
                   value={sidebarTab}
-                  onValueChange={(v) => setSidebarTab(v as "agents" | "skills")}
+                  onValueChange={(v) => setSidebarTab(v as "agents" | "skills" | "memory")}
                 >
-                  <TabsList className="w-full h-8 mb-1">
-                    <TabsTrigger
-                      value="agents"
-                      className="flex-1 text-xs gap-1"
-                    >
-                      <Bot className="h-3 w-3" />
-                      Agents
-                      {agentItems.length > 0 && (
-                        <span className="ml-1 text-[10px] text-muted-foreground">
-                          {agentItems.length}
-                        </span>
+                  <div className="flex items-center gap-1 mb-1">
+                    <TabsList className="h-8 flex-1">
+                      <TabsTrigger
+                        value="agents"
+                        className="flex-1 text-xs gap-1"
+                      >
+                        <Bot className="h-3 w-3" />
+                        Agents
+                        {agentItems.length > 0 && (
+                          <span className="ml-1 text-[10px] text-muted-foreground">
+                            {agentItems.length}
+                          </span>
+                        )}
+                      </TabsTrigger>
+                      <TabsTrigger
+                        value="skills"
+                        className="flex-1 text-xs gap-1"
+                      >
+                        <Brain className="h-3 w-3" />
+                        Skills
+                        {skillItems.length > 0 && (
+                          <span className="ml-1 text-[10px] text-muted-foreground">
+                            {skillItems.length}
+                          </span>
+                        )}
+                      </TabsTrigger>
+                    </TabsList>
+                    <button
+                      type="button"
+                      title="Memory"
+                      aria-label="Memory"
+                      onClick={() =>
+                        setSidebarTab(sidebarTab === "memory" ? "agents" : "memory")
+                      }
+                      className={cn(
+                        "flex h-8 w-8 shrink-0 items-center justify-center rounded-md border transition-colors",
+                        sidebarTab === "memory"
+                          ? "border-foreground/30 bg-accent text-foreground"
+                          : "border-transparent text-muted-foreground hover:bg-accent hover:text-foreground",
                       )}
-                    </TabsTrigger>
-                    <TabsTrigger
-                      value="skills"
-                      className="flex-1 text-xs gap-1"
                     >
-                      <Brain className="h-2 w-2" />
-                      Skills
-                      {skillItems.length > 0 && (
-                        <span className="ml-1 text-[10px] text-muted-foreground">
-                          {skillItems.length}
-                        </span>
-                      )}
-                    </TabsTrigger>
-                  </TabsList>
+                      <DatabaseZap className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
 
                   <TabsContent value="agents" className="mt-0">
                     <SidebarMenu className="gap-0.5">
@@ -1064,6 +1116,65 @@ export function AppSidebar() {
                         ))
                       )}
                     </SidebarMenu>
+                  </TabsContent>
+
+                  <TabsContent value="memory" className="mt-0">
+                    {!memory ? (
+                      <div className="px-2 py-4 space-y-3">
+                        <p className="text-xs text-muted-foreground">
+                          No .memory/ folder found.
+                        </p>
+                      </div>
+                    ) : (
+                      <SidebarMenu className="gap-0.5">
+                        {memory.index_file && (
+                          <SidebarMenuItem>
+                            <SidebarMenuButton
+                              isActive={
+                                viewerFile?.path === memory.index_file.path &&
+                                selectedMemoryFolder === null
+                              }
+                              onClick={() => void openMemoryFile(memory.index_file!)}
+                              className="h-8"
+                            >
+                              <FileText className="h-3.5 w-3.5 shrink-0" />
+                              <span className="truncate">INDEX.md</span>
+                            </SidebarMenuButton>
+                          </SidebarMenuItem>
+                        )}
+                        {memory.index_file && memory.folders.length > 0 && (
+                          <SidebarSeparator className="my-1 w-full" />
+                        )}
+                        {memory.folders.map((folder) => {
+                          const FolderIcon = getMemoryFolderIcon(folder.name);
+                          return (
+                          <SidebarMenuItem key={folder.name}>
+                            <SidebarMenuButton
+                              isActive={selectedMemoryFolder === folder.name}
+                              onClick={() =>
+                                setSelectedMemoryFolder(
+                                  selectedMemoryFolder === folder.name
+                                    ? null
+                                    : folder.name,
+                                )
+                              }
+                              className="h-8"
+                            >
+                              <FolderIcon className="h-3.5 w-3.5 shrink-0" />
+                              <span className="truncate capitalize">
+                                {folder.name}
+                              </span>
+                              {folder.files.length > 0 && (
+                                <span className="ml-auto text-[10px] text-muted-foreground">
+                                  {folder.files.length}
+                                </span>
+                              )}
+                            </SidebarMenuButton>
+                          </SidebarMenuItem>
+                          );
+                        })}
+                      </SidebarMenu>
+                    )}
                   </TabsContent>
                 </Tabs>
               </SidebarGroupContent>

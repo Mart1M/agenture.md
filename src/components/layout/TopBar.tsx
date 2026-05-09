@@ -1,11 +1,12 @@
 import { open } from "@tauri-apps/plugin-dialog";
 import { invoke } from "@tauri-apps/api/core";
 import { useEffect, useState } from "react";
-import { FolderOpen, GitBranch } from "lucide-react";
+import { FolderOpen, GitBranch, Wand2 } from "lucide-react";
 import { useAppStore } from "@/store";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { SidebarTrigger } from "@/components/ui/sidebar";
+import { SetupAgentureDialog } from "@/components/setup/SetupAgentureDialog";
 import type { RepoScanResult } from "@/types";
 
 interface GitGraphRef {
@@ -23,6 +24,7 @@ export function TopBar() {
   const { repoPath, scanResult, setRepoPath, setScanResult, setIsScanning } =
     useAppStore();
   const [currentBranch, setCurrentBranch] = useState<string | null>(null);
+  const [isSetupOpen, setIsSetupOpen] = useState(false);
 
   async function openRepo() {
     const selected = await open({ directory: true, multiple: false });
@@ -96,10 +98,21 @@ export function TopBar() {
           </>
         )}
       </div>
+      <Button
+        variant="outline"
+        size="sm"
+        onClick={() => setIsSetupOpen(true)}
+        disabled={!repoPath}
+        title="Initialize repository with agent memory, rules, and tool config"
+      >
+        <Wand2 className="mr-2 h-4 w-4" />
+        Setup Agenture
+      </Button>
       <Button variant="outline" size="sm" onClick={openRepo}>
         <FolderOpen className="mr-2 h-4 w-4" />
         Open Repository
       </Button>
+      <SetupAgentureDialog open={isSetupOpen} onOpenChange={setIsSetupOpen} />
     </header>
   );
 }

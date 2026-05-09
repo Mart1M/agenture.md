@@ -51,6 +51,7 @@ function TerminalSessionPane({
   cwd,
   isActive,
   onStateChange,
+  initialInput,
 }: {
   sessionId: string;
   tool: AiToolBasic;
@@ -60,12 +61,14 @@ function TerminalSessionPane({
     id: string,
     state: { isRunning: boolean; isSpawning: boolean },
   ) => void;
+  initialInput?: string | null;
 }) {
   const { repoPath } = useAppStore();
   const containerRef = useRef<HTMLDivElement>(null);
   const terminalRef = useRef<Terminal | null>(null);
   const fitAddonRef = useRef<FitAddon | null>(null);
   const isActiveRef = useRef(isActive);
+  const initialInputTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     isActiveRef.current = isActive;
@@ -152,6 +155,10 @@ function TerminalSessionPane({
     void launch(terminal, fitAddon);
 
     return () => {
+      if (initialInputTimerRef.current !== null) {
+        clearTimeout(initialInputTimerRef.current);
+        initialInputTimerRef.current = null;
+      }
       unsubTheme();
       observer.disconnect();
       terminal.dispose();
@@ -223,6 +230,13 @@ function TerminalSessionPane({
       });
       onStateChange(sessionId, { isRunning: true, isSpawning: false });
       setTimeout(() => terminalRef.current?.focus(), 50);
+      if (initialInput) {
+        initialInputTimerRef.current = setTimeout(() => {
+          initialInputTimerRef.current = null;
+          const bytes = Array.from(new TextEncoder().encode(initialInput));
+          invoke("write_terminal", { sessionId, data: bytes }).catch(() => {});
+        }, 3000);
+      }
     } catch (e) {
       terminal.writeln(
         `\r\n\x1b[31mFailed to launch ${tool.label}: ${e}\x1b[0m`,
@@ -454,6 +468,7 @@ export function TerminalView() {
                   cwd={session.cwd}
                   isActive={session.id === activeTerminalSessionId}
                   onStateChange={handleStateChange}
+                  initialInput={session.initialInput}
                 />
               ))
             )}

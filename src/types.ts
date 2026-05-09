@@ -30,11 +30,29 @@ export interface DetectedSkill {
   root_files: SkillFile[];
 }
 
+export interface MemoryFile {
+  raw_name: string;
+  path: string;
+  relative_path: string;
+  size_bytes: number;
+}
+
+export interface MemoryFolder {
+  name: string;
+  files: MemoryFile[];
+}
+
+export interface MemoryScan {
+  index_file: MemoryFile | null;
+  folders: MemoryFolder[];
+}
+
 export interface RepoScanResult {
   repo_path: string;
   agents: DetectedAgent[];
   skills: DetectedSkill[];
   has_agent_context: boolean;
+  memory: MemoryScan | null;
 }
 
 /** Unified item for the sidebar list (agent or skill entry point) */
