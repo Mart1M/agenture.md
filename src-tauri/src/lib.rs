@@ -16,6 +16,8 @@ use commands::terminal::{
 };
 
 const MENU_OPEN_REPOSITORY: &str = "open_repository";
+const MENU_SETTINGS: &str = "settings";
+const MENU_SETUP_AGENTURE: &str = "setup_agenture";
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -58,11 +60,22 @@ pub fn run() {
                         .accelerator("CmdOrCtrl+O")
                         .build(app)?;
 
+                let settings =
+                    MenuItemBuilder::with_id(MENU_SETTINGS, "Settings…")
+                        .accelerator("CmdOrCtrl+,")
+                        .build(app)?;
+
+                let setup_agenture =
+                    MenuItemBuilder::with_id(MENU_SETUP_AGENTURE, "Setup Agenture…")
+                        .build(app)?;
+
                 let mut added_to_file = false;
                 for entry in menu.items()? {
                     if let Some(sub) = entry.as_submenu() {
                         if let Ok(label) = sub.text() {
                             if label == "File" {
+                                sub.prepend(&settings)?;
+                                sub.prepend(&setup_agenture)?;
                                 sub.prepend(&open_repository)?;
                                 added_to_file = true;
                                 break;
@@ -74,6 +87,8 @@ pub fn run() {
                 if !added_to_file {
                     let file_menu = SubmenuBuilder::new(app, "File")
                         .item(&open_repository)
+                        .item(&setup_agenture)
+                        .item(&settings)
                         .build()?;
                     menu.append(&file_menu)?;
                 }
@@ -89,6 +104,12 @@ pub fn run() {
 
                 if event.id() == MENU_OPEN_REPOSITORY {
                     let _ = app.emit("open-repository", ());
+                }
+                if event.id() == MENU_SETTINGS {
+                    let _ = app.emit("open-settings", ());
+                }
+                if event.id() == MENU_SETUP_AGENTURE {
+                    let _ = app.emit("open-setup-agenture", ());
                 }
             }
         })

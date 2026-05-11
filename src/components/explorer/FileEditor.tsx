@@ -37,6 +37,7 @@ import { markdown } from "@codemirror/lang-markdown";
 import { HighlightStyle, syntaxHighlighting } from "@codemirror/language";
 import { tags } from "@lezer/highlight";
 import { useAppStore } from "@/store";
+import { EDITOR_FONT_SIZE_PX } from "@/lib/settings";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { Kbd } from "@/components/ui/kbd";
@@ -96,7 +97,6 @@ const editorTheme = EditorView.theme({
     height: "100%",
     backgroundColor: "transparent",
     color: "var(--foreground)",
-    fontSize: "14px",
   },
   ".cm-scroller": {
     fontFamily:
@@ -289,6 +289,7 @@ export function FileEditor() {
     repoPath,
     setEditContent,
     setFileContent,
+    editorFontSize,
   } = useAppStore();
   const editorHostRef = useRef<HTMLDivElement | null>(null);
   const editorViewRef = useRef<EditorView | null>(null);
@@ -374,6 +375,10 @@ export function FileEditor() {
       });
     }
   }, [editContent]);
+
+  useEffect(() => {
+    editorViewRef.current?.requestMeasure();
+  }, [editorFontSize]);
 
   if (!viewerFile || editContent === null) return null;
   const isSkillReadme = /(^|\/)skills?\.md$/i.test(viewerFile.relative_path);
@@ -580,7 +585,7 @@ export function FileEditor() {
 
   return (
     <div className="relative h-full overflow-hidden bg-background">
-      <div ref={editorHostRef} className="h-full" />
+      <div ref={editorHostRef} className="h-full" style={{ fontSize: EDITOR_FONT_SIZE_PX[editorFontSize] }} />
 
       <div className="pointer-events-none absolute inset-x-0 bottom-0 h-32 bg-linear-to-b from-transparent via-background/55 to-background" />
       <div className="pointer-events-none absolute inset-x-0 bottom-4 flex justify-center px-4">

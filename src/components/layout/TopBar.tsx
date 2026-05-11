@@ -98,16 +98,17 @@ export function TopBar() {
           </>
         )}
       </div>
-      <Button
-        variant="outline"
-        size="sm"
-        onClick={() => setIsSetupOpen(true)}
-        disabled={!repoPath}
-        title="Initialize repository with agent memory, rules, and tool config"
-      >
-        <Wand2 className="mr-2 h-4 w-4" />
-        Setup Agenture
-      </Button>
+      {repoPath && !scanResult?.memory && (
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => setIsSetupOpen(true)}
+          title="Initialize repository with agent memory, rules, and tool config"
+        >
+          <Wand2 className="mr-2 h-4 w-4" />
+          Setup Agenture
+        </Button>
+      )}
       <Button variant="outline" size="sm" onClick={openRepo}>
         <FolderOpen className="mr-2 h-4 w-4" />
         Open Repository

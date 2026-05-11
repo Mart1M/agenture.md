@@ -287,7 +287,9 @@ fn executable_file_in_well_known_dirs(program: &str) -> Option<PathBuf> {
 fn command_exists(cmd: &str) -> bool {
     #[cfg(target_os = "macos")]
     let which_bin = "/usr/bin/which";
-    #[cfg(not(target_os = "macos"))]
+    #[cfg(target_os = "windows")]
+    let which_bin = "where.exe";
+    #[cfg(not(any(target_os = "macos", target_os = "windows")))]
     let which_bin = "which";
 
     let path = effective_path();
@@ -308,10 +310,37 @@ fn command_exists(cmd: &str) -> bool {
     {
         executable_file_in_well_known_dirs(cmd).is_some()
     }
-    #[cfg(not(unix))]
+    #[cfg(target_os = "windows")]
+    {
+        windows_executable_exists(cmd)
+    }
+    #[cfg(not(any(unix, target_os = "windows")))]
     {
         false
     }
+}
+
+#[cfg(target_os = "windows")]
+fn windows_executable_exists(cmd: &str) -> bool {
+    let appdata = std::env::var("APPDATA").unwrap_or_default();
+    let localappdata = std::env::var("LOCALAPPDATA").unwrap_or_default();
+    let userprofile = std::env::var("USERPROFILE").unwrap_or_default();
+
+    // npm global installs land in %APPDATA%\npm\<cmd>.cmd
+    // Scoop installs to %USERPROFILE%\scoop\shims\<cmd>.exe
+    // Winget / manual installs vary
+    let candidates: Vec<PathBuf> = vec![
+        PathBuf::from(&appdata).join("npm").join(format!("{cmd}.cmd")),
+        PathBuf::from(&appdata).join("npm").join(format!("{cmd}.exe")),
+        PathBuf::from(&localappdata).join("Programs").join(cmd).join(format!("{cmd}.exe")),
+        PathBuf::from(&localappdata).join(cmd).join(format!("{cmd}.exe")),
+        PathBuf::from(&userprofile).join("scoop").join("shims").join(format!("{cmd}.exe")),
+        PathBuf::from(&userprofile).join("scoop").join("shims").join(format!("{cmd}.cmd")),
+        PathBuf::from(&userprofile).join(".volta").join("bin").join(format!("{cmd}.cmd")),
+        PathBuf::from(&userprofile).join(".volta").join("bin").join(format!("{cmd}.exe")),
+    ];
+
+    candidates.into_iter().any(|p| p.is_file())
 }
 
 // ── Commands ─────────────────────────────────────────────────────────────────

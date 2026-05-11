@@ -176,8 +176,21 @@ export function GitGraphView() {
       )}
 
       {loadErr && (
-        <div className="m-4 rounded-lg border border-destructive/50 bg-destructive/10 px-4 py-3 text-sm text-destructive">
-          {loadErr}
+        <div className="flex flex-1 items-center justify-center p-8">
+          <div className="text-center space-y-1">
+            <GitGraphIcon className="mx-auto h-8 w-8 opacity-40" />
+            <p className="text-sm font-medium text-muted-foreground">
+              {loadErr.includes("not a git repository")
+                ? "This folder is not a Git repository"
+                : "Failed to load git history"}
+            </p>
+            {loadErr.includes("not a git repository") && (
+              <p className="text-xs text-muted-foreground/60">
+                Run <code className="font-mono">git init</code> to initialize
+                one
+              </p>
+            )}
+          </div>
         </div>
       )}
 

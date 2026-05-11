@@ -1122,7 +1122,7 @@ export function AppSidebar() {
                   </TabsContent>
 
                   <TabsContent value="memory" className="mt-0">
-                    {!memory ? (
+                    {scanResult && !memory && (
                       <div className="px-2 py-4 space-y-3">
                         <p className="text-xs text-muted-foreground">
                           No .memory/ folder found.
@@ -1137,7 +1137,8 @@ export function AppSidebar() {
                           Setup Agenture
                         </Button>
                       </div>
-                    ) : (
+                    )}
+                    {memory && (
                       <SidebarMenu className="gap-0.5">
                         {memory.index_file && (
                           <SidebarMenuItem>

@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { listen } from "@tauri-apps/api/event";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -10,14 +10,76 @@ import { SkillNavigator } from "./components/skills/SkillNavigator";
 import { MemoryNavigator } from "./components/memory/MemoryNavigator";
 import { TerminalDialog } from "./components/terminal/TerminalDialog";
 import { Toaster } from "./components/common/Toaster";
+import { SettingsDialog } from "./components/settings/SettingsDialog";
+import { SetupAgentureDialog } from "./components/setup/SetupAgentureDialog";
+import { applySettings, loadSettings } from "./lib/settings";
+import { check } from "@tauri-apps/plugin-updater";
+import { relaunch } from "@tauri-apps/plugin-process";
+import { showToast } from "./components/common/Toaster";
 
 function App() {
   const { selectedItem, repoPath, scanResult } = useAppStore();
   const isAutoRescanningRef = useRef(false);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [isSetupOpen, setIsSetupOpen] = useState(false);
+
+  async function checkForUpdates() {
+    try {
+      const update = await check();
+      if (!update?.available) return;
+      showToast({
+        title: `Update available — v${update.version}`,
+        description: "Click to install and relaunch",
+        action: {
+          label: "Install",
+          onClick: async () => {
+            await update.downloadAndInstall();
+            await relaunch();
+          },
+        },
+      });
+    } catch {
+      // silently ignore — no network, private repo, etc.
+    }
+  }
+
+  useEffect(() => {
+    const settings = loadSettings();
+    applySettings(settings);
+
+    if (settings.reopenLastRepo) {
+      const last = useAppStore.getState().recentRepos[0];
+      if (last) void useAppStore.getState().openRecentRepo(last);
+    }
+
+    if (settings.autoCheckUpdates) {
+      void checkForUpdates();
+    }
+  }, []);
 
   useEffect(() => {
     const pending = listen("open-repository", () => {
       void useAppStore.getState().openRepository();
+    });
+
+    return () => {
+      void pending.then((unlisten) => unlisten());
+    };
+  }, []);
+
+  useEffect(() => {
+    const pending = listen("open-settings", () => {
+      setIsSettingsOpen(true);
+    });
+
+    return () => {
+      void pending.then((unlisten) => unlisten());
+    };
+  }, []);
+
+  useEffect(() => {
+    const pending = listen("open-setup-agenture", () => {
+      setIsSetupOpen(true);
     });
 
     return () => {
@@ -63,6 +125,8 @@ function App() {
           </div>
         </SidebarInset>
         <TerminalDialog />
+        <SetupAgentureDialog open={isSetupOpen} onOpenChange={setIsSetupOpen} />
+        <SettingsDialog open={isSettingsOpen} onOpenChange={setIsSettingsOpen} />
         <Toaster />
       </SidebarProvider>
     </TooltipProvider>

@@ -6,6 +6,10 @@ type ToastOptions = {
   title: string;
   description?: string;
   duration?: number;
+  action?: {
+    label: string;
+    onClick: () => void | Promise<void>;
+  };
 };
 
 type Toast = ToastOptions & {
@@ -52,11 +56,23 @@ export function Toaster() {
             {toast.description && (
               <p className="mt-1 text-xs text-muted-foreground">{toast.description}</p>
             )}
+            {toast.action && (
+              <Button
+                size="sm"
+                className="mt-2 h-7 text-xs"
+                onClick={() => {
+                  void toast.action!.onClick();
+                  setToasts((current) => current.filter((item) => item.id !== toast.id));
+                }}
+              >
+                {toast.action.label}
+              </Button>
+            )}
           </div>
           <Button
             variant="ghost"
             size="icon-sm"
-            className="-mr-1 -mt-1"
+            className="-mr-1 -mt-1 shrink-0"
             onClick={() =>
               setToasts((current) => current.filter((item) => item.id !== toast.id))
             }

@@ -2,6 +2,7 @@ import { create } from "zustand";
 import { open } from "@tauri-apps/plugin-dialog";
 import { invoke } from "@tauri-apps/api/core";
 import type { FileItem, RepoScanResult, SkillSearchResult, ViewerFile } from "./types";
+import { type EditorFontSize, loadSettings } from "./lib/settings";
 
 // ── Recent repos helpers ──────────────────────────────────────────────────────
 const RECENT_REPOS_KEY = "agenture_recent_repos";
@@ -90,6 +91,10 @@ interface AppState {
   skillResults: SkillSearchResult[];
   isSearchingSkills: boolean;
 
+  // Settings
+  editorFontSize: EditorFontSize;
+  setEditorFontSize: (size: EditorFontSize) => void;
+
   // Actions
   setRepoPath: (path: string) => void;
   setScanResult: (result: RepoScanResult) => void;
@@ -143,6 +148,7 @@ const initialState = {
   terminalDialogCallback: null,
   terminalSessions: [],
   activeTerminalSessionId: null,
+  editorFontSize: loadSettings().editorFontSize,
 };
 
 let sessionCounter = 0;
@@ -156,6 +162,7 @@ let openRepositoryInFlight = false;
 export const useAppStore = create<AppState>((set) => ({
   ...initialState,
 
+  setEditorFontSize: (size) => set({ editorFontSize: size }),
   setRepoPath: (path) => set({ repoPath: path }),
   setScanResult: (result) => set({ scanResult: result }),
   setIsScanning: (v) => set({ isScanning: v }),
@@ -235,7 +242,7 @@ export const useAppStore = create<AppState>((set) => ({
     try {
       const selected = await open({ directory: true, multiple: false });
       if (!selected) return;
-      set({ isScanning: true });
+      set({ isScanning: true, scanResult: null });
       try {
         const result = await invoke<RepoScanResult>("scan_repository", {
           repoPath: selected,
@@ -253,7 +260,7 @@ export const useAppStore = create<AppState>((set) => ({
   },
 
   openRecentRepo: async (path) => {
-    set({ isScanning: true });
+    set({ isScanning: true, scanResult: null });
     try {
       const result = await invoke<RepoScanResult>("scan_repository", {
         repoPath: path,
