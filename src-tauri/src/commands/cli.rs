@@ -24,7 +24,10 @@ pub fn run_cli_command(
         .find(|arg| !arg.starts_with('-'))
         .ok_or_else(|| "No package provided".to_string())?;
 
-    if !ALLOWED_PACKAGES.contains(&package_arg.as_str()) {
+    // Strip optional version/tag suffix (e.g. "skills@latest" → "skills")
+    let package_name = package_arg.split('@').next().unwrap_or(package_arg);
+
+    if !ALLOWED_PACKAGES.contains(&package_name) {
         return Err(format!("Package not allowed: {}", package_arg));
     }
 
