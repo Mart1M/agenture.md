@@ -33,9 +33,28 @@ pub fn run_cli_command(
         return Err(format!("Invalid working directory: {}", cwd));
     }
 
-    let child = Command::new(&command)
-        .args(&args)
+    // Inject -y so npx never prompts "Ok to proceed?" — the process has no TTY
+    // and would hang indefinitely waiting for stdin input.
+    let npx_args: Vec<String> = std::iter::once("-y".to_string()).chain(args).collect();
+
+    // On Windows, npm tools like npx are installed as .cmd files which
+    // CreateProcessW cannot execute directly — wrap with cmd.exe /C.
+    #[cfg(target_os = "windows")]
+    let child = Command::new("cmd.exe")
+        .args(["/C", &command])
+        .args(&npx_args)
         .current_dir(cwd_path)
+        .stdin(std::process::Stdio::null())
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::piped())
+        .spawn()
+        .map_err(|e| format!("Failed to spawn process: {}", e))?;
+
+    #[cfg(not(target_os = "windows"))]
+    let child = Command::new(&command)
+        .args(&npx_args)
+        .current_dir(cwd_path)
+        .stdin(std::process::Stdio::null())
         .stdout(std::process::Stdio::piped())
         .stderr(std::process::Stdio::piped())
         .spawn()

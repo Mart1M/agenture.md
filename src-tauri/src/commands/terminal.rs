@@ -321,14 +321,11 @@ fn command_exists(cmd: &str) -> bool {
 }
 
 #[cfg(target_os = "windows")]
-fn windows_executable_exists(cmd: &str) -> bool {
+fn windows_resolve_command(cmd: &str) -> Option<PathBuf> {
     let appdata = std::env::var("APPDATA").unwrap_or_default();
     let localappdata = std::env::var("LOCALAPPDATA").unwrap_or_default();
     let userprofile = std::env::var("USERPROFILE").unwrap_or_default();
 
-    // npm global installs land in %APPDATA%\npm\<cmd>.cmd
-    // Scoop installs to %USERPROFILE%\scoop\shims\<cmd>.exe
-    // Winget / manual installs vary
     let candidates: Vec<PathBuf> = vec![
         PathBuf::from(&appdata).join("npm").join(format!("{cmd}.cmd")),
         PathBuf::from(&appdata).join("npm").join(format!("{cmd}.exe")),
@@ -340,7 +337,12 @@ fn windows_executable_exists(cmd: &str) -> bool {
         PathBuf::from(&userprofile).join(".volta").join("bin").join(format!("{cmd}.exe")),
     ];
 
-    candidates.into_iter().any(|p| p.is_file())
+    candidates.into_iter().find(|p| p.is_file())
+}
+
+#[cfg(target_os = "windows")]
+fn windows_executable_exists(cmd: &str) -> bool {
+    windows_resolve_command(cmd).is_some()
 }
 
 // ── Commands ─────────────────────────────────────────────────────────────────
@@ -535,10 +537,33 @@ pub fn spawn_terminal(
     let command_path =
         executable_file_in_well_known_dirs(&command).unwrap_or_else(|| PathBuf::from(&command));
 
-    #[cfg(not(unix))]
+    // On Windows, resolve to the actual .cmd/.exe path. CreateProcessW cannot execute
+    // .cmd/.bat files directly — they must go through cmd.exe /C.
+    #[cfg(target_os = "windows")]
+    let command_path = windows_resolve_command(&command)
+        .unwrap_or_else(|| PathBuf::from(&command));
+
+    #[cfg(not(any(unix, target_os = "windows")))]
     let command_path = PathBuf::from(&command);
 
+    #[cfg(target_os = "windows")]
+    let mut cmd = {
+        let is_batch = command_path.extension().map_or(false, |e| {
+            e.eq_ignore_ascii_case("cmd") || e.eq_ignore_ascii_case("bat")
+        });
+        if is_batch {
+            let mut c = CommandBuilder::new("cmd.exe");
+            c.arg("/C");
+            c.arg(command_path.as_os_str());
+            c
+        } else {
+            CommandBuilder::new(command_path.as_os_str())
+        }
+    };
+
+    #[cfg(not(target_os = "windows"))]
     let mut cmd = CommandBuilder::new(command_path.as_os_str());
+
     for arg in &args {
         cmd.arg(arg);
     }
