@@ -5,8 +5,16 @@
 #   - Or: Actions → Release → Run workflow
 #
 # Repository secrets (Settings → Secrets and variables → Actions):
-#   TAURI_SIGNING_PRIVATE_KEY     — full contents of your minisign private key file
+#   TAURI_SIGNING_PRIVATE_KEY          — full contents of your minisign private key file
 #   TAURI_SIGNING_PRIVATE_KEY_PASSWORD — optional, if the key is encrypted
+#
+#   macOS code signing & notarization (Apple Developer account required):
+#   APPLE_CERTIFICATE                  — base64-encoded .p12 certificate (Developer ID Application)
+#   APPLE_CERTIFICATE_PASSWORD         — password for the .p12
+#   APPLE_SIGNING_IDENTITY             — e.g. "Developer ID Application: Your Name (TEAMID)"
+#   APPLE_ID                           — your Apple ID email
+#   APPLE_PASSWORD                     — app-specific password (appleid.apple.com → Security)
+#   APPLE_TEAM_ID                      — 10-char team ID from developer.apple.com
 #
 # GITHUB_TOKEN is provided by Actions. Enable: Settings → Actions → Workflow permissions → Read and write.
 
@@ -73,6 +81,12 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         with:
           tagName: v__VERSION__
           releaseName: 'Agenture v__VERSION__'

@@ -36,7 +36,12 @@ const CATEGORY_FILES: Record<OptionId, string[]> = {
   claude: [".claude/commands/setup-agenture.md", "CLAUDE.md"],
 };
 
-const OPTIONS: { id: OptionId; label: string; description: string; files: string }[] = [
+const OPTIONS: {
+  id: OptionId;
+  label: string;
+  description: string;
+  files: string;
+}[] = [
   {
     id: "cursor",
     label: "Cursor",
@@ -115,7 +120,9 @@ export function SetupAgentureDialog({ open, onOpenChange }: Props) {
 
   async function pruneUnselected() {
     if (!repoPath) return;
-    const unselected = OPTIONS.map((o) => o.id).filter((id) => !selected.has(id));
+    const unselected = OPTIONS.map((o) => o.id).filter(
+      (id) => !selected.has(id),
+    );
     for (const id of unselected) {
       for (const rel of CATEGORY_FILES[id]) {
         try {
@@ -149,7 +156,9 @@ export function SetupAgentureDialog({ open, onOpenChange }: Props) {
       if (result.exit_code === 0) {
         await pruneUnselected();
         setDone(true);
-        const scan = await invoke<RepoScanResult>("scan_repository", { repoPath });
+        const scan = await invoke<RepoScanResult>("scan_repository", {
+          repoPath,
+        });
         setScanResult(scan);
       } else {
         setError(`Command exited with code ${result.exit_code}`);
@@ -182,9 +191,15 @@ export function SetupAgentureDialog({ open, onOpenChange }: Props) {
       await navigator.clipboard.writeText(SETUP_PROMPT);
       setCopiedPrompt(true);
       setTimeout(() => setCopiedPrompt(false), 2000);
-      showToast({ title: "Copied!", description: "Prompt copied to clipboard" });
+      showToast({
+        title: "Copied!",
+        description: "Prompt copied to clipboard",
+      });
     } catch {
-      showToast({ title: "Copy failed", description: "Could not access clipboard" });
+      showToast({
+        title: "Copy failed",
+        description: "Could not access clipboard",
+      });
     }
   }
 
@@ -205,11 +220,41 @@ export function SetupAgentureDialog({ open, onOpenChange }: Props) {
         {!done ? (
           <div className="space-y-4">
             <div className="space-y-2">
-              <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+              <p className="text-xs font-medium text-muted-foreground">
                 What to install
               </p>
               <div className="space-y-1.5">
+                {/* Default — always included */}
+                <div className="flex items-start gap-3 rounded-md border border-border bg-muted/30 px-3 py-2.5 pointer-events-none">
+                  <Checkbox
+                    id="opt-agents"
+                    checked
+                    disabled
+                    className="mt-0.5 shrink-0 opacity-50"
+                  />
+                  <Label
+                    htmlFor="opt-agents"
+                    className="min-w-0 flex-1 flex-col items-start gap-0.5 cursor-default"
+                  >
+                    <span className="flex items-center gap-1.5 text-xs font-medium leading-none">
+                      .agents
+                      <span className="rounded px-1 py-0.5 text-[9px] font-semibold uppercase tracking-wide bg-primary/10 text-primary leading-none">
+                        Default
+                      </span>
+                    </span>
+                    <span className="text-xs text-muted-foreground leading-snug">
+                      Agent memory, rules, and skills manifest — included in every setup
+                    </span>
+                    <span className="font-mono text-[10px] text-muted-foreground/60">
+                      .agents/, AGENTS.md, AGENT_MEMORY_RULES.md, AGENT_SKILLS_INSTALL.md
+                    </span>
+                  </Label>
+                </div>
 
+                {/* Provider-specific extras */}
+                <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground/60 pt-1 px-0.5">
+                  Provider-specific extras
+                </p>
                 {OPTIONS.map((opt) => {
                   const isChecked = selected.has(opt.id);
                   return (
@@ -217,7 +262,9 @@ export function SetupAgentureDialog({ open, onOpenChange }: Props) {
                       key={opt.id}
                       className={cn(
                         "flex items-start gap-3 rounded-md border px-3 py-2.5 transition-colors",
-                        isChecked ? "border-border bg-muted/30" : "border-border/50 opacity-50",
+                        isChecked
+                          ? "border-border bg-muted/30"
+                          : "border-border/50 opacity-50",
                       )}
                     >
                       <Checkbox
@@ -234,7 +281,9 @@ export function SetupAgentureDialog({ open, onOpenChange }: Props) {
                           !running && "cursor-pointer",
                         )}
                       >
-                        <span className="text-xs font-medium leading-none">{opt.label}</span>
+                        <span className="text-xs font-medium leading-none">
+                          {opt.label}
+                        </span>
                         <span className="text-xs text-muted-foreground leading-snug">
                           {opt.description}
                         </span>
@@ -267,10 +316,7 @@ export function SetupAgentureDialog({ open, onOpenChange }: Props) {
               >
                 Cancel
               </Button>
-              <Button
-                onClick={handleInstall}
-                disabled={running || !repoPath}
-              >
+              <Button onClick={handleInstall} disabled={running || !repoPath}>
                 {running ? (
                   <>
                     <LoadingSpinner size="sm" />

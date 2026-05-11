@@ -22,6 +22,7 @@ import {
   GitFork,
   Shapes,
   Sliders,
+  Wand2,
   type LucideIcon,
 } from "lucide-react";
 import { invoke } from "@tauri-apps/api/core";
@@ -76,6 +77,7 @@ import type {
   SkillFolder,
   ViewerFile,
 } from "@/types";
+import { SetupAgentureDialog } from "@/components/setup/SetupAgentureDialog";
 import appIconUrl from "../../../resources/icon.svg?url";
 import { toggleAppTheme } from "@/lib/theme";
 import {
@@ -322,6 +324,7 @@ export function AppSidebar() {
   } = useAppStore();
 
   const memory = scanResult?.memory ?? null;
+  const [isSetupOpen, setIsSetupOpen] = useState(false);
   const [isCreateAgentOpen, setIsCreateAgentOpen] = useState(false);
   const [isCreateCustomAgentOpen, setIsCreateCustomAgentOpen] = useState(false);
   const [newCustomAgentName, setNewCustomAgentName] = useState("");
@@ -1124,6 +1127,15 @@ export function AppSidebar() {
                         <p className="text-xs text-muted-foreground">
                           No .memory/ folder found.
                         </p>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="w-full"
+                          onClick={() => setIsSetupOpen(true)}
+                        >
+                          <Wand2 className="h-3.5 w-3.5" />
+                          Setup Agenture
+                        </Button>
                       </div>
                     ) : (
                       <SidebarMenu className="gap-0.5">
@@ -1619,6 +1631,8 @@ export function AppSidebar() {
           </CommandList>
         </Command>
       </CommandDialog>
+
+      <SetupAgentureDialog open={isSetupOpen} onOpenChange={setIsSetupOpen} />
     </Sidebar>
   );
 }
