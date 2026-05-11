@@ -68,7 +68,9 @@ function TerminalSessionPane({
   const terminalRef = useRef<Terminal | null>(null);
   const fitAddonRef = useRef<FitAddon | null>(null);
   const isActiveRef = useRef(isActive);
-  const initialInputTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const initialInputTimerRef = useRef<ReturnType<typeof setTimeout> | null>(
+    null,
+  );
 
   useEffect(() => {
     isActiveRef.current = isActive;
@@ -476,7 +478,7 @@ export function TerminalView() {
         </div>
 
         <div className="flex min-h-0 shrink-0 self-stretch">
-          <div className="flex w-7 shrink-0 flex-col items-center border-l border-border/80 bg-muted/20 border">
+          <div className="flex w-7 shrink-0 flex-col items-center border-l border-border/80 bg-muted/20 border-r">
             <Button
               type="button"
               variant="ghost"

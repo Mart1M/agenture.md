@@ -21,7 +21,8 @@ export function MemoryNavigator() {
   if (sidebarTab !== "memory" || !selectedMemoryFolder) return null;
 
   const memory = scanResult?.memory ?? null;
-  const folder = memory?.folders.find((f) => f.name === selectedMemoryFolder) ?? null;
+  const folder =
+    memory?.folders.find((f) => f.name === selectedMemoryFolder) ?? null;
 
   async function openFile(file: MemoryFile) {
     setCurrentView("explorer");
@@ -66,7 +67,7 @@ export function MemoryNavigator() {
               type="button"
               onClick={() => void openFile(file)}
               className={cn(
-                "flex w-full items-center gap-2 rounded-md px-2 py-1 text-left text-xs transition-colors",
+                "flex w-full items-center gap-2 rounded-md p-2 text-left text-xs transition-colors",
                 viewerFile?.path === file.path
                   ? "bg-accent text-accent-foreground font-medium"
                   : "text-muted-foreground hover:bg-accent/60 hover:text-foreground",
