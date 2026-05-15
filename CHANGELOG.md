@@ -2,6 +2,15 @@
 
 ## [Unreleased]
 
+## [0.1.8] - 2026-05-15
+
+### Added
+- Persistent update dialog with download progress and error feedback
+- **Check for Updates…** in the native File menu and in Settings
+
+### Changed
+- Skills install dialog: custom install path and extra agent targets
+
 ## [0.1.7] - 2026-05-15
 
 ### Fixed

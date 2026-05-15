@@ -18,6 +18,7 @@ use commands::terminal::{
 const MENU_OPEN_REPOSITORY: &str = "open_repository";
 const MENU_SETTINGS: &str = "settings";
 const MENU_SETUP_AGENTURE: &str = "setup_agenture";
+const MENU_CHECK_UPDATES: &str = "check_for_updates";
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -69,11 +70,16 @@ pub fn run() {
                     MenuItemBuilder::with_id(MENU_SETUP_AGENTURE, "Setup Agenture…")
                         .build(app)?;
 
+                let check_updates =
+                    MenuItemBuilder::with_id(MENU_CHECK_UPDATES, "Check for Updates…")
+                        .build(app)?;
+
                 let mut added_to_file = false;
                 for entry in menu.items()? {
                     if let Some(sub) = entry.as_submenu() {
                         if let Ok(label) = sub.text() {
                             if label == "File" {
+                                sub.prepend(&check_updates)?;
                                 sub.prepend(&settings)?;
                                 sub.prepend(&setup_agenture)?;
                                 sub.prepend(&open_repository)?;
@@ -89,6 +95,7 @@ pub fn run() {
                         .item(&open_repository)
                         .item(&setup_agenture)
                         .item(&settings)
+                        .item(&check_updates)
                         .build()?;
                     menu.append(&file_menu)?;
                 }
@@ -110,6 +117,9 @@ pub fn run() {
                 }
                 if event.id() == MENU_SETUP_AGENTURE {
                     let _ = app.emit("open-setup-agenture", ());
+                }
+                if event.id() == MENU_CHECK_UPDATES {
+                    let _ = app.emit("check-for-updates", ());
                 }
             }
         })

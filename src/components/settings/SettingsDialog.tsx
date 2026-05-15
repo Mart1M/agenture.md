@@ -17,6 +17,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { type AppSettings, loadSettings, saveSettings, applySettings } from "@/lib/settings";
+import { CHECK_UPDATES_EVENT } from "@/lib/updates";
 import { useAppStore } from "@/store";
 
 interface Props {
@@ -148,6 +149,20 @@ export function SettingsDialog({ open, onOpenChange }: Props) {
                 checked={settings.autoCheckUpdates}
                 onCheckedChange={(v) => update("autoCheckUpdates", v)}
               />
+            </Row>
+            <Row
+              label="Check now"
+              description="Look for a new version on GitHub"
+            >
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() =>
+                  window.dispatchEvent(new CustomEvent(CHECK_UPDATES_EVENT))
+                }
+              >
+                Check for updates
+              </Button>
             </Row>
           </Section>
         </div>

@@ -12,6 +12,13 @@ import { formatName } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { LoadingSpinner } from "@/components/common/LoadingSpinner";
 import { showToast } from "@/components/common/Toaster";
@@ -30,6 +37,19 @@ const INSTALL_TARGETS = [
   { id: "codex", label: "Codex", description: ".codex/skills/" },
   { id: "gemini-cli", label: "Gemini CLI", description: ".gemini/skills/" },
   { id: "opencode", label: "OpenCode", description: ".opencode/skills/" },
+];
+
+const CUSTOM_TARGET_ID = "custom";
+
+const EXTRA_AGENTS = [
+  "aider-desk", "amp", "antigravity", "augment", "bob", "openclaw", "cline",
+  "codearts-agent", "codebuddy", "codemaker", "codestudio", "command-code",
+  "continue", "cortex", "crush", "deepagents", "devin", "dexto", "droid",
+  "firebender", "forgecode", "github-copilot", "goose", "hermes-agent",
+  "junie", "iflow-cli", "kilo", "kimi-cli", "kiro-cli", "kode", "mcpjam",
+  "mistral-vibe", "mux", "openhands", "pi", "qoder", "qwen-code", "replit",
+  "rovodev", "roo", "tabnine-cli", "trae", "trae-cn", "warp", "windsurf",
+  "zencoder", "neovate", "pochi", "adal",
 ];
 
 type SkillsLock = {
@@ -135,6 +155,7 @@ export function SkillsPage() {
   const [selectedInstallTargets, setSelectedInstallTargets] = useState<
     string[]
   >([INSTALL_TARGETS[0].id]);
+  const [customInstallPath, setCustomInstallPath] = useState("");
   const [installError, setInstallError] = useState<string | null>(null);
   /** Once true: top search bar layout; landing uses centered hero. */
   const [committedSearch, setCommittedSearch] = useState(false);
@@ -203,8 +224,14 @@ export function SkillsPage() {
 
   async function install(skill: SkillSearchResult, agents: string[]) {
     if (!repoPath) return;
-    if (agents.length === 0) {
+    const standardAgents = agents.filter((a) => a !== CUSTOM_TARGET_ID);
+    const hasCustom = agents.includes(CUSTOM_TARGET_ID);
+    if (standardAgents.length === 0 && !hasCustom) {
       setInstallError("Select at least one install target.");
+      return;
+    }
+    if (hasCustom && !customInstallPath.trim()) {
+      setInstallError("Enter a custom path.");
       return;
     }
     setInstallingId(skill.skill_id);
@@ -214,7 +241,12 @@ export function SkillsPage() {
         skill.owner && skill.repo
           ? `${skill.owner}/${skill.repo}`
           : skill.skill_id;
-      const args =
+
+      const allAgents = hasCustom
+        ? [...standardAgents, customInstallPath.trim()]
+        : standardAgents;
+
+      const buildArgs = (agentList: string[], skillName = skill.name) =>
         skill.owner && skill.repo
           ? [
               "--yes",
@@ -222,9 +254,8 @@ export function SkillsPage() {
               "add",
               source,
               "--skill",
-              skill.name,
-              "--agent",
-              ...agents,
+              skillName,
+              ...(agentList.length > 0 ? ["--agent", ...agentList] : []),
               "--yes",
             ]
           : [
@@ -232,15 +263,42 @@ export function SkillsPage() {
               "skills@latest",
               "add",
               source,
-              "--agent",
-              ...agents,
+              ...(agentList.length > 0 ? ["--agent", ...agentList] : []),
               "--yes",
             ];
-      const result = await invoke<CommandOutput>("run_cli_command", {
+
+      const args = buildArgs(allAgents);
+      let result = await invoke<CommandOutput>("run_cli_command", {
         command: "npx",
         args,
         cwd: repoPath,
       });
+
+      // If the install failed with "No matching skills found", the registry name
+      // may differ from the actual folder name in the repo (e.g. "implement-design"
+      // vs "figma-implement-design"). Parse the available skills from the CLI
+      // output and retry with the best matching one.
+      if (result.exit_code !== 0 && skill.owner && skill.repo) {
+        const combined = result.stdout + result.stderr;
+        if (/no matching skills found/i.test(combined)) {
+          const available = [...combined.matchAll(/- ([\w-]+)/g)].map(
+            (m) => m[1],
+          );
+          const fallback =
+            available.find(
+              (s) => s.includes(skill.name) || skill.name.includes(s),
+            ) ?? available[0];
+          if (fallback && fallback !== skill.name) {
+            const retryArgs = buildArgs(allAgents, fallback);
+            result = await invoke<CommandOutput>("run_cli_command", {
+              command: "npx",
+              args: retryArgs,
+              cwd: repoPath,
+            });
+          }
+        }
+      }
+
       if (result.exit_code === 0) {
         const scan = await invoke<RepoScanResult>("scan_repository", {
           repoPath,
@@ -367,7 +425,7 @@ export function SkillsPage() {
             {searchControls}
           </div>
 
-          <div className="flex-1 overflow-y-auto px-6 pb-6">
+          <div className="flex-1 overflow-y-auto px-6 py-6">
         {isSearchingSkills && (
           <div className="flex justify-center py-12">
             <LoadingSpinner />
@@ -574,6 +632,46 @@ export function SkillsPage() {
                   )}
                 </button>
               ))}
+
+              {/* Custom location */}
+              <button
+                type="button"
+                onClick={() => toggleInstallTarget(CUSTOM_TARGET_ID)}
+                className={[
+                  "flex w-full items-center justify-between rounded-md border px-3 py-2 text-left transition-colors",
+                  selectedInstallTargets.includes(CUSTOM_TARGET_ID)
+                    ? "border-foreground bg-accent"
+                    : "hover:bg-accent/50",
+                ].join(" ")}
+              >
+                <span>
+                  <span className="block text-sm font-medium">Other agent</span>
+                  <span className="block text-xs text-muted-foreground">
+                    windsurf, goose, warp…
+                  </span>
+                </span>
+                {selectedInstallTargets.includes(CUSTOM_TARGET_ID) && (
+                  <CheckCircle2 className="h-4 w-4 text-green-500" />
+                )}
+              </button>
+
+              {selectedInstallTargets.includes(CUSTOM_TARGET_ID) && (
+                <Select
+                  value={customInstallPath}
+                  onValueChange={(v) => setCustomInstallPath(v ?? "")}
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Select an agent…" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {EXTRA_AGENTS.map((agent) => (
+                      <SelectItem key={agent} value={agent}>
+                        {agent}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
             </div>
 
             <div className="space-y-3 px-6 py-4 shrink-0 border-t">
@@ -597,7 +695,10 @@ export function SkillsPage() {
                   }
                   disabled={
                     installingId === installTargetSkill.skill_id ||
-                    selectedInstallTargets.length === 0
+                    selectedInstallTargets.length === 0 ||
+                    (selectedInstallTargets.includes(CUSTOM_TARGET_ID) &&
+                      selectedInstallTargets.length === 1 &&
+                      !customInstallPath.trim())
                   }
                 >
                   {installingId === installTargetSkill.skill_id ? (
