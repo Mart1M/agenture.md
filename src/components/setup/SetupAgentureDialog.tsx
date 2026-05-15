@@ -18,7 +18,7 @@ import { showToast } from "@/components/common/Toaster";
 import type { CommandOutput, RepoScanResult } from "@/types";
 
 const SETUP_PROMPT =
-  "Read AGENT_SKILLS_INSTALL.md at the repository root and execute phase 2 as described there — run the actual shell commands from the project root (network allowed), not a summary. Use the correct npx skills --agent (or -a) for this session (e.g. codex, cursor, github-copilot, claude-code); ask once if unsure. End with npx skills list and tell me what to commit.";
+  "Read AGENT_SKILLS_INSTALL.md at the repository root and execute phase 2 then phase 3 as described there — run the actual shell commands from the project root (network allowed), not a summary. Use the correct npx skills --agent (or -a) for this session (e.g. codex, cursor, github-copilot, claude-code); ask once if unsure. After installing skills, complete phase 3: update AGENTS.md with a real Project description, actual Conventions inferred from the repo, and the Installed skills list with one-line explanations. End with npx skills list and tell me what to commit.";
 
 type OptionId = "global" | "cursor" | "copilot" | "claude";
 
