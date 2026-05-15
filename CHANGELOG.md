@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+## [0.1.5] - 2026-05-15
+
+### Fixed
+- Resolve `npx` path in `run_cli_command` to fix "No such file or directory" during setup
+
 ## [0.1.4] - 2026-05-09
 
 ### Added
