@@ -1,9 +1,30 @@
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::process::Command;
 
+use crate::commands::terminal::{effective_path, executable_file_in_well_known_dirs};
 use crate::types::CommandOutput;
 
 const ALLOWED_PACKAGES: &[&str] = &["agenture-cli", "skills"];
+
+/// Resolve the absolute path for `npx` (or any npm binary).
+///
+/// GUI apps inherit a stripped PATH that often omits nvm/fnm/Homebrew/Volta
+/// directories, so `Command::new("npx")` fails with "No such file or directory"
+/// even when npx is clearly installed. We first try the enriched `effective_path`,
+/// then fall back to the well-known-dirs scan used by the PTY terminal.
+#[cfg(unix)]
+fn resolve_npx() -> PathBuf {
+    // Check whether the enriched PATH already contains npx.
+    let path = effective_path();
+    for dir in path.split(':') {
+        let candidate = Path::new(dir).join("npx");
+        if candidate.is_file() {
+            return candidate;
+        }
+    }
+    // Fallback: filesystem scan of well-known install directories.
+    executable_file_in_well_known_dirs("npx").unwrap_or_else(|| PathBuf::from("npx"))
+}
 
 #[tauri::command]
 pub fn run_cli_command(
@@ -42,21 +63,35 @@ pub fn run_cli_command(
 
     // On Windows, npm tools like npx are installed as .cmd files which
     // CreateProcessW cannot execute directly — wrap with cmd.exe /C.
+    // Always inject the enriched PATH so nvm/fnm/Homebrew/Volta installs are visible.
     #[cfg(target_os = "windows")]
     let child = Command::new("cmd.exe")
         .args(["/C", &command])
         .args(&npx_args)
         .current_dir(cwd_path)
+        .env("PATH", effective_path())
         .stdin(std::process::Stdio::null())
         .stdout(std::process::Stdio::piped())
         .stderr(std::process::Stdio::piped())
         .spawn()
         .map_err(|e| format!("Failed to spawn process: {}", e))?;
 
-    #[cfg(not(target_os = "windows"))]
+    #[cfg(unix)]
+    let child = Command::new(resolve_npx())
+        .args(&npx_args)
+        .current_dir(cwd_path)
+        .env("PATH", effective_path())
+        .stdin(std::process::Stdio::null())
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::piped())
+        .spawn()
+        .map_err(|e| format!("Failed to spawn process: {}", e))?;
+
+    #[cfg(not(any(target_os = "windows", unix)))]
     let child = Command::new(&command)
         .args(&npx_args)
         .current_dir(cwd_path)
+        .env("PATH", effective_path())
         .stdin(std::process::Stdio::null())
         .stdout(std::process::Stdio::piped())
         .stderr(std::process::Stdio::piped())

@@ -144,7 +144,7 @@ fn build_effective_path() -> String {
     join_os_paths(&segments)
 }
 
-fn effective_path() -> &'static str {
+pub(crate) fn effective_path() -> &'static str {
     EFFECTIVE_PATH.get_or_init(build_effective_path)
 }
 
@@ -243,7 +243,7 @@ fn unix_is_executable(bin: &Path) -> bool {
 /// When `which` fails (sandboxed PATH, symlink-only installs), look for `cmd` under
 /// dirs where npm/mise/Homebrew binaries usually live — common for Claude Code.
 #[cfg(unix)]
-fn executable_file_in_well_known_dirs(program: &str) -> Option<PathBuf> {
+pub(crate) fn executable_file_in_well_known_dirs(program: &str) -> Option<PathBuf> {
     let p = Path::new(program);
     if p.is_absolute() && unix_is_executable(p) {
         return Some(p.to_path_buf());
