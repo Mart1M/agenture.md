@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+## [0.1.7] - 2026-05-15
+
+### Fixed
+- Import `std::path::Path` on all platforms in `cli.rs` (Windows build)
+
 ## [0.1.6] - 2026-05-15
 
 ### Fixed
