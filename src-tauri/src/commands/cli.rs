@@ -1,7 +1,10 @@
-use std::path::{Path, PathBuf};
 use std::process::Command;
 
-use crate::commands::terminal::{effective_path, executable_file_in_well_known_dirs};
+use crate::commands::terminal::effective_path;
+#[cfg(unix)]
+use crate::commands::terminal::executable_file_in_well_known_dirs;
+#[cfg(unix)]
+use std::path::{Path, PathBuf};
 use crate::types::CommandOutput;
 
 const ALLOWED_PACKAGES: &[&str] = &["agenture-cli", "skills"];

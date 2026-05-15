@@ -72,6 +72,9 @@ jobs:
         uses: swatinem/rust-cache@v2
         with:
           workspaces: ./src-tauri -> target
+          # Separate cache per matrix row — parallel macOS jobs share OS + lockfile
+          # and otherwise race on the same cache entry (broken rustup shims).
+          shared-key: ${{ matrix.platform }}-${{ matrix.args }}
 
       - name: Install frontend dependencies
         run: pnpm install --frozen-lockfile

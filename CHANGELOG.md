@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+## [0.1.6] - 2026-05-15
+
+### Fixed
+- Gate Unix-only `npx` resolution imports so Windows CI builds compile
+- Isolate Rust cache keys per release matrix job to avoid macOS cross-target races
+
 ## [0.1.5] - 2026-05-15
 
 ### Fixed
