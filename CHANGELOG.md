@@ -2,7 +2,7 @@
 
 ## [Unreleased]
 
-## [0.1.4] - 2025-05-09
+## [0.1.4] - 2026-05-09
 
 ### Added
 - Memory tab in the sidebar: browse `.memory/` folder with folder-level navigation in the primary sidebar and file list in a secondary sidebar
