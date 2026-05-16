@@ -2,6 +2,13 @@
 
 ## [Unreleased]
 
+## [0.1.9] - 2026-05-16
+
+### Fixed
+- Restore correct updater public key — auto-update was failing with a signature mismatch
+- Replace raw technical update error with a user-friendly message
+- Add "Download manually" and "Later" buttons to update error state
+
 ## [0.1.8] - 2026-05-15
 
 ### Added
