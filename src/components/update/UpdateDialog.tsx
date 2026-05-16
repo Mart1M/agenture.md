@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Download } from "lucide-react";
+import { openUrl } from "@tauri-apps/plugin-opener";
 import { getVersion } from "@tauri-apps/api/app";
 import type { Update } from "@tauri-apps/plugin-updater";
 import {
@@ -13,6 +14,8 @@ import {
 import { Button } from "@/components/ui/button";
 import { LoadingSpinner } from "@/components/common/LoadingSpinner";
 
+const RELEASES_URL = "https://github.com/Mart1M/agenture.md/releases/latest";
+
 interface Props {
   update: Update | null;
   installing: boolean;
@@ -20,6 +23,7 @@ interface Props {
   downloadedBytes: number;
   totalBytes: number | null;
   onInstall: () => void;
+  onDismiss: () => void;
 }
 
 export function UpdateDialog({
@@ -29,6 +33,7 @@ export function UpdateDialog({
   downloadedBytes,
   totalBytes,
   onInstall,
+  onDismiss,
 }: Props) {
   const [currentVersion, setCurrentVersion] = useState<string | null>(null);
 
@@ -79,25 +84,46 @@ export function UpdateDialog({
         )}
 
         {installError && (
-          <p className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-xs text-destructive">
+          <p className="text-sm text-muted-foreground">
             {installError}
           </p>
         )}
 
         <DialogFooter className="sm:justify-start">
-          <Button onClick={onInstall} disabled={installing}>
-            {installing ? (
-              <>
-                <LoadingSpinner size="sm" />
-                Installing…
-              </>
-            ) : (
-              <>
-                <Download className="h-4 w-4" />
-                Install and restart
-              </>
-            )}
-          </Button>
+          {installError ? (
+            <>
+              <Button
+                variant="outline"
+                onClick={() => void openUrl(RELEASES_URL)}
+              >
+                Download manually
+              </Button>
+              <Button variant="ghost" onClick={onDismiss}>
+                Later
+              </Button>
+            </>
+          ) : (
+            <>
+              <Button onClick={onInstall} disabled={installing}>
+                {installing ? (
+                  <>
+                    <LoadingSpinner size="sm" />
+                    Installing…
+                  </>
+                ) : (
+                  <>
+                    <Download className="h-4 w-4" />
+                    Install and restart
+                  </>
+                )}
+              </Button>
+              {!installing && (
+                <Button variant="ghost" onClick={onDismiss}>
+                  Later
+                </Button>
+              )}
+            </>
+          )}
         </DialogFooter>
       </DialogContent>
     </Dialog>
