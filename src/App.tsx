@@ -9,6 +9,8 @@ import { TopBar } from "./components/layout/TopBar";
 import { MainPanel } from "./components/layout/MainPanel";
 import { SkillNavigator } from "./components/skills/SkillNavigator";
 import { MemoryNavigator } from "./components/memory/MemoryNavigator";
+import { GitSidePanel } from "./components/git/GitSidePanel";
+import { GitDiffPanel } from "./components/git/GitDiffPanel";
 import { TerminalDialog } from "./components/terminal/TerminalDialog";
 import { Toaster } from "./components/common/Toaster";
 import { SettingsDialog } from "./components/settings/SettingsDialog";
@@ -178,6 +180,8 @@ function App() {
             {showSkillNavigator && <SkillNavigator />}
             <MemoryNavigator />
             <MainPanel />
+            <GitDiffPanel />
+            <GitSidePanel />
           </div>
         </SidebarInset>
         <TerminalDialog />

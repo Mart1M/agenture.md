@@ -585,7 +585,11 @@ export function FileEditor() {
 
   return (
     <div className="relative h-full overflow-hidden bg-background">
-      <div ref={editorHostRef} className="h-full" style={{ fontSize: EDITOR_FONT_SIZE_PX[editorFontSize] }} />
+      <div
+        ref={editorHostRef}
+        className="h-full"
+        style={{ fontSize: EDITOR_FONT_SIZE_PX[editorFontSize] }}
+      />
 
       <div className="pointer-events-none absolute inset-x-0 bottom-0 h-32 bg-linear-to-b from-transparent via-background/55 to-background" />
       <div className="pointer-events-none absolute inset-x-0 bottom-4 flex justify-center px-4">
@@ -645,7 +649,9 @@ export function FileEditor() {
                             Metadata:
                           </span>
                         </p>
-                        <p className="font-medium">{metadataTokens}/100 tokens</p>
+                        <p className="font-medium">
+                          {metadataTokens}/100 tokens
+                        </p>
                       </div>
                       <Separator />
                       <div className="space-y-1">
@@ -672,7 +678,9 @@ export function FileEditor() {
                         <span className="font-medium text-muted-foreground">
                           Lines:
                         </span>{" "}
-                        <span className="font-medium">{agentsLineCount}/200</span>
+                        <span className="font-medium">
+                          {agentsLineCount}/200
+                        </span>
                       </p>
                     </div>
                   )}
@@ -698,7 +706,7 @@ export function FileEditor() {
           >
             <Save className="h-3.5 w-3.5 mr-1" />
             Save
-            {!saving && <Kbd className="ml-1 bg-background/70">⌘S</Kbd>}
+            {!saving && <Kbd className="ml-1">⌘S</Kbd>}
           </Button>
         </div>
       </div>

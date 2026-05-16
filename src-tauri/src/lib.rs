@@ -3,7 +3,10 @@ mod types;
 
 use commands::cli::run_cli_command;
 use commands::fetch::fetch_url;
-use commands::git::git_graph_snapshot;
+use commands::git::{
+    git_checkout_branch, git_commit, git_create_branch, git_file_diff, git_graph_snapshot,
+    git_pull, git_push, git_restore_paths, git_stage_paths, git_working_tree,
+};
 use commands::files::{
     create_directory, create_skill_scaffold, delete_file, move_path, read_file, rename_file,
     search_files_content, write_file,
@@ -48,6 +51,15 @@ pub fn run() {
             list_package_workspaces,
             detect_npm_client,
             git_graph_snapshot,
+            git_working_tree,
+            git_file_diff,
+            git_stage_paths,
+            git_restore_paths,
+            git_commit,
+            git_pull,
+            git_push,
+            git_checkout_branch,
+            git_create_branch,
         ])
         .setup(|app| {
             #[cfg(desktop)]

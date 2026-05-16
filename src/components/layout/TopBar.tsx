@@ -2,6 +2,7 @@ import { open } from "@tauri-apps/plugin-dialog";
 import { invoke } from "@tauri-apps/api/core";
 import { useEffect, useState } from "react";
 import { FolderOpen, GitBranch, Wand2 } from "lucide-react";
+import { formatBranchLabel } from "@/lib/git-panel";
 import { useAppStore } from "@/store";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -21,8 +22,15 @@ interface GitGraphSnapshot {
 }
 
 export function TopBar() {
-  const { repoPath, scanResult, setRepoPath, setScanResult, setIsScanning } =
-    useAppStore();
+  const {
+    repoPath,
+    scanResult,
+    setRepoPath,
+    setScanResult,
+    setIsScanning,
+    gitPanelOpen,
+    toggleGitPanel,
+  } = useAppStore();
   const [currentBranch, setCurrentBranch] = useState<string | null>(null);
   const [isSetupOpen, setIsSetupOpen] = useState(false);
 
@@ -85,9 +93,12 @@ export function TopBar() {
             <span className="text-muted-foreground text-sm">/</span>
             <span className="text-sm text-muted-foreground">{repoName}</span>
             {currentBranch && (
-              <span className="inline-flex items-center gap-1 text-sm text-muted-foreground">
-                <GitBranch className="h-3.5 w-3.5" />
-                {currentBranch}
+              <span
+                className="inline-flex max-w-[14rem] min-w-0 items-center gap-1 text-sm text-muted-foreground"
+                title={currentBranch}
+              >
+                <GitBranch className="h-3.5 w-3.5 shrink-0" />
+                <span className="truncate">{formatBranchLabel(currentBranch, 28)}</span>
               </span>
             )}
             {total > 0 && (
@@ -98,6 +109,17 @@ export function TopBar() {
           </>
         )}
       </div>
+      {repoPath && (
+        <Button
+          variant={gitPanelOpen ? "secondary" : "outline"}
+          size="sm"
+          onClick={toggleGitPanel}
+          title="Show or hide version control"
+        >
+          <GitBranch className="mr-2 h-4 w-4" />
+          Changes
+        </Button>
+      )}
       {repoPath && !scanResult?.memory && (
         <Button
           variant="outline"

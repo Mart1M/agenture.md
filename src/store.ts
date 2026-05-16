@@ -3,6 +3,17 @@ import { open } from "@tauri-apps/plugin-dialog";
 import { invoke } from "@tauri-apps/api/core";
 import type { FileItem, RepoScanResult, SkillSearchResult, ViewerFile } from "./types";
 import { type EditorFontSize, loadSettings } from "./lib/settings";
+import type { GitPanelTab } from "./types/git";
+
+const GIT_PANEL_OPEN_KEY = "agenture_git_panel_open";
+
+function loadGitPanelOpen(): boolean {
+  try {
+    return localStorage.getItem(GIT_PANEL_OPEN_KEY) !== "false";
+  } catch {
+    return true;
+  }
+}
 
 // ── Recent repos helpers ──────────────────────────────────────────────────────
 const RECENT_REPOS_KEY = "agenture_recent_repos";
@@ -95,6 +106,18 @@ interface AppState {
   editorFontSize: EditorFontSize;
   setEditorFontSize: (size: EditorFontSize) => void;
 
+  // Git side panel (global, right side)
+  gitPanelOpen: boolean;
+  gitPanelTab: GitPanelTab;
+  gitDiffPath: string | null;
+  gitDiffDisplayPath: string | null;
+  gitDiffStaged: boolean;
+  setGitPanelOpen: (open: boolean) => void;
+  toggleGitPanel: () => void;
+  setGitPanelTab: (tab: GitPanelTab) => void;
+  setGitDiffSelection: (path: string, displayPath: string, staged: boolean) => void;
+  clearGitDiff: () => void;
+
   // Actions
   setRepoPath: (path: string) => void;
   setScanResult: (result: RepoScanResult) => void;
@@ -149,6 +172,11 @@ const initialState = {
   terminalSessions: [],
   activeTerminalSessionId: null,
   editorFontSize: loadSettings().editorFontSize,
+  gitPanelOpen: loadGitPanelOpen(),
+  gitPanelTab: "commit" as GitPanelTab,
+  gitDiffPath: null,
+  gitDiffDisplayPath: null,
+  gitDiffStaged: false,
 };
 
 let sessionCounter = 0;
@@ -163,6 +191,26 @@ export const useAppStore = create<AppState>((set) => ({
   ...initialState,
 
   setEditorFontSize: (size) => set({ editorFontSize: size }),
+  setGitPanelOpen: (open) => {
+    try {
+      localStorage.setItem(GIT_PANEL_OPEN_KEY, open ? "true" : "false");
+    } catch {
+      /* ignore */
+    }
+    set({
+      gitPanelOpen: open,
+      ...(open ? {} : { gitDiffPath: null, gitDiffDisplayPath: null }),
+    });
+  },
+  toggleGitPanel: () => {
+    const next = !useAppStore.getState().gitPanelOpen;
+    useAppStore.getState().setGitPanelOpen(next);
+  },
+  setGitPanelTab: (tab) => set({ gitPanelTab: tab }),
+  setGitDiffSelection: (path, displayPath, staged) =>
+    set({ gitDiffPath: path, gitDiffDisplayPath: displayPath, gitDiffStaged: staged }),
+  clearGitDiff: () =>
+    set({ gitDiffPath: null, gitDiffDisplayPath: null, gitDiffStaged: false }),
   setRepoPath: (path) => set({ repoPath: path }),
   setScanResult: (result) => set({ scanResult: result }),
   setIsScanning: (v) => set({ isScanning: v }),
