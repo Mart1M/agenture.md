@@ -74,7 +74,8 @@ function App() {
         setTotalBytes(total);
       });
     } catch (err) {
-      setInstallError(err instanceof Error ? err.message : String(err));
+      console.error("[updater]", err);
+      setInstallError("The update could not be installed. Please try again or download the latest version manually.");
       setInstalling(false);
     }
   }, [pendingUpdate, installing]);
@@ -189,6 +190,7 @@ function App() {
           downloadedBytes={downloadedBytes}
           totalBytes={totalBytes}
           onInstall={() => void handleInstallUpdate()}
+          onDismiss={() => setPendingUpdate(null)}
         />
         <Toaster />
       </SidebarProvider>
